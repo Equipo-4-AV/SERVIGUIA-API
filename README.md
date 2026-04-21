@@ -3,7 +3,7 @@
 > [!IMPORTANT]
 > For Developers, after cloning, run:
 ```bash
-bash scripts/setup-hooks.sh
+git config core.hooksPath .githooks
 ```
 
 ### Dependencies

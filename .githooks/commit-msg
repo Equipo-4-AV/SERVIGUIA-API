@@ -20,7 +20,7 @@ if ! [[ "$commit_msg" =~ $pattern ]]; then
   echo -e "${YELLOW}       Example: \"feat: new endpoint\"${NC}"
   echo -e "${YELLOW}       Opening Convention...${NC}"
 
-  code -g README.md:1
+  code -g README.md:17 #-> index of commit table
   exit 1
 fi
 
