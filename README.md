@@ -1,7 +1,7 @@
 ## 🛠️ Setup
 
 > [!IMPORTANT]
-> For Developers, after cloning, run:
+> For Developers, after cloning run:
 ```bash
 git config core.hooksPath .githooks
 ```
