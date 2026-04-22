@@ -12,12 +12,13 @@ git config core.hooksPath .githooks
 Run the docker compose to build and setup everything related with the proyect.
 Don't worry about hot-loading. Docker Compose uses watch to stablish a sync connection between the container and our code.
 
+> [!WARNING]
+> Make sure Docker Desktop is running
 ```bash
 docker compose -f docker/compose.yaml watch
 ```
 
 If you want to view container logs use the following command
-
 ```bash
 docker compose -f docker/compose.yaml logs -f api
 ```
