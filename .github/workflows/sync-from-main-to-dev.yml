@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 jobs:
-  sync-to-staging:
+  sync-to-dev:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
