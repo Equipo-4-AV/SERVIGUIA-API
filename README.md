@@ -2,19 +2,29 @@
 
 > [!IMPORTANT]
 > For Developers, after cloning run:
+
 ```bash
 git config core.hooksPath .githooks
 ```
 
-### Dependencies
+### How to Run?
 
-Activate virtual enviroment.
+Run the docker compose to build and setup everything related with the proyect.
+Don't worry about hot-loading. Docker Compose uses watch to stablish a sync connection between the container and our code.
+
+> [!WARNING]
+> Make sure Docker Desktop is running
 ```bash
-pip install -r requirements.txt
+docker compose -f docker/compose.yaml watch
 ```
 
+If you want to view container logs use the following command
+```bash
+docker compose -f docker/compose.yaml logs -f api
+```
 
-### Commit Title Types
+## 📝 Commit Title Types
+
 | **Type**   | **Description**                                                                       |
 | ---------- | ------------------------------------------------------------------------------------- |
 | `feat`     | Adds, adjusts, or removes a new **feature** in the project                            |

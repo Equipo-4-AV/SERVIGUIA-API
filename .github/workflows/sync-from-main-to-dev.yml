@@ -1,0 +1,26 @@
+name: sync-from-main-to-dev
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  sync-to-dev:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4.2.2
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Merge main into dev
+        run: |
+          git fetch origin dev:dev
+          git checkout dev
+          git merge main -m "chore: main into dev"
+          git push origin dev

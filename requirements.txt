@@ -1,1 +1,7 @@
-ÿþ
+fastapi
+uvicorn
+openai
+python-dotenv
+python-multipart
+pydantic
+pytest
