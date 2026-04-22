@@ -1,0 +1,23 @@
+name: serviguia-api
+
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    ports:
+      - "8000:8000"
+    develop:
+      watch:
+        - action: sync
+          path: ..
+          target: /app
+          ignore:
+            - .git/
+            - __pycache__/
+            - "*.pyc"
+            - .venv/
+        - action: rebuild
+          path: ../requirements.txt
+        - action: rebuild
+          path: Dockerfile
