@@ -22,6 +22,7 @@ services:
           path: ../server/requirements.txt
         - action: rebuild
           path: ../server/Dockerfile
+
   client:
     build:
       context: ..
