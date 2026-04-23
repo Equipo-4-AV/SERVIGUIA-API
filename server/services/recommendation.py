@@ -1,16 +1,4 @@
-import json
-from pathlib import Path
-
-DATA_DIR = Path(__file__).parent.parent / "data"
-
-
-def _load() -> tuple[list[dict], dict]:
-    with open(DATA_DIR / "trabajadores.json", encoding="utf-8") as f:
-        workers = json.load(f)
-    with open(DATA_DIR / "pesos.json", encoding="utf-8") as f:
-        config = json.load(f)
-    return workers, config
-
+from utils.load import load_data
 
 def _score(worker: dict, pesos: dict, norm: dict) -> float:
     precio_range = norm["precio_hora_max"] - norm["precio_hora_min"]
@@ -41,7 +29,7 @@ def _rango_precio(precio_hora: int) -> str:
 
 
 def get_top_by_category(categoria: str, limit: int = 10) -> list[dict]:
-    workers, config = _load()
+    workers, config = load_data()
     pesos = config
     norm  = config["_normalizacion"]
 
@@ -69,5 +57,5 @@ def get_top_by_category(categoria: str, limit: int = 10) -> list[dict]:
 
 
 def get_categories() -> list[str]:
-    workers, config = _load()
+    workers, config = load_data()
     return config.get("_categorias_validas", [])
