@@ -9,6 +9,8 @@ from slowapi.errors import RateLimitExceeded
 from utils.rate_limiter import limiter
 
 from routes.recommendation_route import router as recommendation_router
+from routes.status import router as status_router #!not fully implemented but needed for testing
+from routes.kickoff import router as kickoff_router 
 from utils.load import load_prompt
 
 project_name = "ServiAPI"
@@ -60,7 +62,10 @@ def read_root(request : Request):
 def read_api(request : Request):
     return {"message": f"From these routes, we receive data via push notifications from {os.getenv('CLIENT_APP')}"}
 
+#region routers
 app.include_router(recommendation_router, prefix="/api")
+app.include_router(status_router, prefix="/api")
+app.include_router(kickoff_router, prefix="/api")
 
 @app.exception_handler(RequestValidationError)
 async def handle_422(request: Request, exc: RequestValidationError):
