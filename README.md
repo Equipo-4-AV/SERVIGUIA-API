@@ -37,6 +37,12 @@ If you want to view container logs use the following command
 docker compose -f docker/compose.yaml logs -f server
 ```
 
+Client logs:
+
+```bash
+docker compose -f docker/compose.yaml logs -f client
+```
+
 > [!TIP]
 > `venv` is Python virtual environment, while `.env` is environment variables file.
 

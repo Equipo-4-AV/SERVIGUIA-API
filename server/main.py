@@ -31,11 +31,11 @@ Receives input data of user form mobile app: {os.getenv('CLIENT_APP')}
 # region Root
 @app.get("/")
 def read_root():
-    return {project_name}
+    return {"service": project_name}
 
 @app.get("/api")
 def read_api():
-    return {f"From these routes, we receive data via push notifications from {os.getenv('CLIENT_APP')}"}
+    return {"message": f"From these routes, we receive data via push notifications from {os.getenv('CLIENT_APP')}"}
 
 
 app.include_router(test_router, prefix="/api/test")
