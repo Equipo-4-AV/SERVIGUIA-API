@@ -1,0 +1,41 @@
+{
+  "_descripcion": "Pesos para el algoritmo de recomendación. Todos suman 1.0. Valores más altos = mayor influencia en el score final.",
+  "calificacion": 0.40,
+  "num_reviews": 0.15,
+  "experiencia_años": 0.20,
+  "precio_hora": 0.15,
+  "trabajos_completados": 0.10,
+
+  "_normalizacion": {
+    "calificacion_max": 5.0,
+    "precio_hora_min": 100,
+    "precio_hora_max": 400,
+    "experiencia_max": 20,
+    "trabajos_max": 400,
+    "reviews_max": 100
+  },
+
+  "_categorias_validas": [
+    "plomeria",
+    "electricidad",
+    "pintura",
+    "limpieza",
+    "carpinteria",
+    "aire acondicionado",
+    "cerrajeria",
+    "jardineria",
+    "herreria"
+  ],
+
+  "_mapeo_keywords": {
+    "plomeria": ["fuga", "tuberia", "agua", "drenaje", "caño", "gotero", "calentador", "llave", "baño inundado", "filtración"],
+    "electricidad": ["luz", "corto", "apagón", "cable", "contacto", "interruptor", "tablero", "foco", "instalación eléctrica", "corriente"],
+    "pintura": ["pintura", "pintar", "pared", "mancha", "descascarado", "impermeabilizante", "textura", "color"],
+    "limpieza": ["limpieza", "limpiar", "sucio", "mugre", "polvo", "desinfectar", "ordenar", "aseo"],
+    "carpinteria": ["madera", "mueble", "puerta", "closet", "cajón", "bisagra", "carpintero", "tabla"],
+    "aire acondicionado": ["clima", "aire", "calor", "frío", "ac", "minisplit", "gas refrigerante", "ventilación", "enfriar"],
+    "cerrajeria": ["chapa", "llave", "cerradura", "cerrajero", "puerta bloqueada", "duplicado", "caja fuerte"],
+    "jardineria": ["jardín", "poda", "pasto", "plantas", "árbol", "riego", "maleza"],
+    "herreria": ["reja", "portón", "metal", "soldadura", "hierro", "herrería", "puerta metálica"]
+  }
+}
