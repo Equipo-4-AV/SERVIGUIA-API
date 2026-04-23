@@ -7,20 +7,44 @@
 git config core.hooksPath .githooks
 ```
 
+### Project Structure
+
+- `server/`: FastAPI backend, Dockerfile, and requirements.
+- `client/`: React frontend.
+- `docker/`: Compose configuration.
+- `.githooks/`: shared commit hooks for the whole repository.
+- `.env`: centralized environment variables for `server` and `client`.
+
 ### How to Run?
 
 Run the docker compose to build and setup everything related with the proyect.
 Don't worry about hot-loading. Docker Compose uses watch to stablish a sync connection between the container and our code.
 
+> [!WARNING]
+> Make sure Docker Desktop is running
 ```bash
 docker compose -f docker/compose.yaml watch
 ```
 
-If you want to view container logs use the following command
+Create your env file once at project root:
 
 ```bash
-docker compose -f docker/compose.yaml logs -f api
+cp .env.example .env
 ```
+
+If you want to view container logs use the following command
+```bash
+docker compose -f docker/compose.yaml logs -f server
+```
+
+Client logs:
+
+```bash
+docker compose -f docker/compose.yaml logs -f client
+```
+
+> [!TIP]
+> `venv` is Python virtual environment, while `.env` is environment variables file.
 
 ## 📝 Commit Title Types
 
