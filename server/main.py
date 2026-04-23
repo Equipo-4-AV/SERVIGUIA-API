@@ -4,6 +4,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.routing import APIRoute
 
 from routes.example_route import router as test_router
+from routes.recommendation_route import router as recommendation_router
 
 project_name = "ServiAPI"
 
@@ -39,6 +40,7 @@ def read_api():
 
 
 app.include_router(test_router, prefix="/api/test")
+app.include_router(recommendation_router, prefix="/api")
 
 @app.exception_handler(RequestValidationError)
 async def handle_422(request: Request, exc: RequestValidationError):
