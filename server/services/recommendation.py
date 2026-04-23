@@ -1,45 +1,5 @@
-from typing import TypedDict
-
-from pydantic import BaseModel
-
-from utils.load import load_data
-
-
-# --- Models ---
-
-Worker = TypedDict("Worker", {
-    "id": str,
-    "nombre": str,
-    "categoria": str,
-    "subcategorias": list[str],
-    "calificacion": float,
-    "num_reviews": int,
-    "precio_hora": int,
-    "disponible": bool,
-    "experiencia_años": int,
-    "trabajos_completados": int,
-    "zona": str,
-    "telefono": str,
-})
-
-NormConfig = TypedDict("NormConfig", {
-    "calificacion_max": float,
-    "precio_hora_min": int,
-    "precio_hora_max": int,
-    "experiencia_max": int,
-    "trabajos_max": int,
-    "reviews_max": int,
-})
-
-
-class Provider(BaseModel):
-    id: str
-    nombre: str
-    categoria: str
-    rating: float
-    badges: list[str]
-    rango_precio: str
-    disponibilidad: str
+from models.recommendation import Worker, NormConfig, Provider
+from utils.load import load_workers, load_config
 
 
 # --- Scoring ---
@@ -101,7 +61,8 @@ def get_top_by_category(categoria: str, limit: int = 10) -> list[Provider]:
     Filters by category and availability, scores each candidate using a
     weighted formula, and returns up to `limit` results sorted descending.
     """
-    workers, config = load_data()
+    workers = load_workers()
+    config  = load_config()
     norm: NormConfig = config["_normalizacion"]
 
     normalized_category = categoria.lower().strip()
@@ -122,5 +83,5 @@ def get_top_by_category(categoria: str, limit: int = 10) -> list[Provider]:
 
 def get_categories() -> list[str]:
     """Returns the list of valid service categories."""
-    _, config = load_data()
+    config = load_config()
     return config.get("_categorias_validas", [])
