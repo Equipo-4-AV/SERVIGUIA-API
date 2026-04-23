@@ -1,16 +1,25 @@
 import os
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.routing import APIRoute
 
-from routes.example_route import router as test_router
 from routes.recommendation_route import router as recommendation_router
 
 project_name = "ServiAPI"
 
+#region APIKEY check
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    #! check if .env contains key
+    if not os.getenv("OPENAI_API_KEY"):
+        raise RuntimeError("OPENAI_API_KEY no configurada. Abortando inicio del servidor.")
+    yield
+
 app = FastAPI(
-    title=project_name,
-    description=f"""
+    lifespan = lifespan,
+    title = project_name,
+    description = f"""
 *{project_name}*
 
 ## Description
@@ -25,7 +34,6 @@ Receives input data of user form mobile app: {os.getenv('CLIENT_APP')}
     version="0.0.1",
     contact={
         "name": "Equipo 4",
-        # "email": "",
     }
 )
 
@@ -38,8 +46,6 @@ def read_root():
 def read_api():
     return {"message": f"From these routes, we receive data via push notifications from {os.getenv('CLIENT_APP')}"}
 
-
-app.include_router(test_router, prefix="/api/test")
 app.include_router(recommendation_router, prefix="/api")
 
 @app.exception_handler(RequestValidationError)

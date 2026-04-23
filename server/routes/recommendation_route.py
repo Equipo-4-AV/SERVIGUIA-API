@@ -5,12 +5,12 @@ router = APIRouter()
 
 
 @router.get("/categorias")
-def list_categories():
+async def list_categories():
     return {"categorias": get_categories()}
 
 
 @router.get("/recomendacion")
-def recommend(
+async def recommend(
     categoria: str = Query(..., description="Categoría del servicio requerido"),
     limit: int = Query(10, ge=1, le=10),
 ):
