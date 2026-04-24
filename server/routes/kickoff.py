@@ -36,12 +36,11 @@ def process_classification(task_id: str, user_text: str):
         )
 
         response = client.chat.completions.create(
-            model="gpt-4o",
+            model="gpt-5-nano",
             messages=[
                 {"role": "system", "content": contexto_dinamico},
                 {"role": "user", "content": user_text}
             ],
-            temperature=0,
             response_format={"type": "json_object"}
         )
         

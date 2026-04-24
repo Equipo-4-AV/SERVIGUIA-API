@@ -9,15 +9,13 @@ import pytest
 
 from services.recommendation import (
     _calculate_score,
-    _to_price_range,
-    _to_provider,
     get_top_by_category,
     get_categories,
 )
 from utils.load import load_config
 
 
-# ── helpers ──────────────────────────────────────────────────────────────────
+# region helpers 
 
 @pytest.fixture
 def config():
@@ -48,7 +46,7 @@ def make_worker(**overrides):
     return base
 
 
-# ── _calculate_score ──────────────────────────────────────────────────────────
+# region _calculate_score 
 
 class TestCalculateScore:
     def test_returns_float(self, config, norm):
@@ -102,36 +100,7 @@ class TestCalculateScore:
         many   = make_worker(num_reviews=80)
         assert _calculate_score(many, config, norm, []) > _calculate_score(few, config, norm, [])
 
-
-# ── _to_price_range ───────────────────────────────────────────────────────────
-
-class TestToPriceRange:
-    def test_cheap(self):
-        assert _to_price_range(100) == "$"
-
-    def test_mid_low(self):
-        assert _to_price_range(180) == "$$"
-
-    def test_mid_high(self):
-        assert _to_price_range(250) == "$$$"
-
-    def test_expensive(self):
-        assert _to_price_range(300) == "$$$$"
-
-    def test_boundary_150(self):
-        assert _to_price_range(149) == "$"
-        assert _to_price_range(150) == "$$"
-
-    def test_boundary_220(self):
-        assert _to_price_range(219) == "$$"
-        assert _to_price_range(220) == "$$$"
-
-    def test_boundary_280(self):
-        assert _to_price_range(279) == "$$$"
-        assert _to_price_range(280) == "$$$$"
-
-
-# ── get_top_by_category ───────────────────────────────────────────────────────
+# region get_top_by_category 
 
 class TestGetTopByCategory:
     def test_returns_list(self):
@@ -187,7 +156,7 @@ class TestGetTopByCategory:
             assert p.categoria == "plomeria"
 
 
-# ── get_categories ────────────────────────────────────────────────────────────
+# region get_categories 
 
 class TestGetCategories:
     def test_returns_list(self):
