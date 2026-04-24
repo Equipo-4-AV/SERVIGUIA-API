@@ -14,7 +14,7 @@ async def recommend(
     categoria: str = Query(..., description="Categoría del servicio requerido"),
     limit: int = Query(10, ge=1, le=10),
 ):
-    proveedores = get_top_by_category(categoria, limit)
+    proveedores = get_top_by_category(categoria, limit=limit)
 
     if not proveedores:
         raise HTTPException(
