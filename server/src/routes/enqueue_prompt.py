@@ -21,6 +21,6 @@ async def enqueue_prompt_classification(
         store.set_failed(data.task_id, "task_id no encontrado")
         raise HTTPException(status_code=404, detail="task_id no encontrado")
 
-    store.mark_processing(data.task_id)
+    store.set_processing(data.task_id)
     background_tasks.add_task(run_classification, data.task_id, data.context)
     return {"task_id": data.task_id, "enqueued": True}

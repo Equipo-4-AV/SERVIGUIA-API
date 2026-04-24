@@ -12,7 +12,7 @@ class InMemoryTaskStore:
     def create_placeholder(self, task_id: str) -> None:
         self._data[task_id] = {"status": "starting"}
 
-    def mark_processing(self, task_id: str) -> None:
+    def set_processing(self, task_id: str) -> None:
         self._data[task_id] = {"status": "processing"}
 
     def set_completed(self, task_id: str, result: dict) -> None:
