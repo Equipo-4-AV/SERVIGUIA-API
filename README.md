@@ -22,6 +22,7 @@ Don't worry about hot-loading. Docker Compose uses watch to stablish a sync conn
 
 > [!WARNING]
 > Make sure Docker Desktop is running
+
 ```bash
 docker compose -f docker/compose.yaml watch
 ```
@@ -33,6 +34,7 @@ cp .env.example .env
 ```
 
 If you want to view container logs use the following command
+
 ```bash
 docker compose -f docker/compose.yaml logs -f server
 ```
@@ -48,6 +50,7 @@ docker compose -f docker/compose.yaml logs -f client
 
 ## 📝 Commit Title Types
 
+
 | **Type**   | **Description**                                                                       |
 | ---------- | ------------------------------------------------------------------------------------- |
 | `feat`     | Adds, adjusts, or removes a new **feature** in the project                            |
@@ -61,5 +64,7 @@ docker compose -f docker/compose.yaml logs -f client
 | `ops`      | Changes related to **operations** like deployment, infrastructure, or scripts         |
 | `chore`    | Miscellaneous tasks (e.g., updating `.gitignore`, non-functional maintenance)         |
 
+
 > [!NOTE]
 > Also accepts compound titles like feat&fix
+

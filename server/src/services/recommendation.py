@@ -1,61 +1,110 @@
-from src.utils.load import load_data
+import math
 
-def _score(worker: dict, pesos: dict, norm: dict) -> float:
-    precio_range = norm["precio_hora_max"] - norm["precio_hora_min"]
+from src.models.recommendation import Worker, NormConfig, Provider
+from src.utils.load import load_workers, load_config
 
-    calificacion  = worker["calificacion"] / norm["calificacion_max"]
-    precio        = 1 - (worker["precio_hora"] - norm["precio_hora_min"]) / precio_range
-    experiencia   = min(worker["experiencia_años"] / norm["experiencia_max"], 1.0)
-    reviews       = min(worker["num_reviews"] / norm["reviews_max"], 1.0)
-    completados   = min(worker["trabajos_completados"] / norm["trabajos_max"], 1.0)
+
+# --- Scoring ---
+
+def _calculate_score(
+    worker: Worker,
+    weights: dict,
+    norm: NormConfig,
+    subcategories: list[str],
+) -> float:
+    """Computes the recommendation score using the formula:
+
+    S = (Wc * C_norm) + (Wr * (1 - e^(-λR))) + (Wb * B_norm) + (Wsub * Sub_norm)
+
+    - C_norm:   normalized rating (calificacion / 5)
+    - 1-e^(-λR): exponential smoothing over number of reviews — avoids
+                 unfair advantage for workers with very high review counts
+    - B_norm:   worker's total subcategories normalized by max possible badges
+    - Sub_norm: proportion of requested subcategories the worker covers
+    """
+    lambda_ = weights["lambda"]
+
+    c_norm   = worker["calificacion"] / norm["calificacion_max"]
+    r_score  = 1 - math.exp(-lambda_ * worker["num_reviews"])
+    b_norm   = min(len(worker["subcategorias"]) / norm["badges_max"], 1.0)
+
+    if subcategories:
+        worker_subs   = {s.lower() for s in worker["subcategorias"]}
+        requested_subs = {s.lower() for s in subcategories}
+        sub_norm = len(worker_subs & requested_subs) / len(requested_subs)
+    else:
+        sub_norm = 1.0
 
     return (
-        calificacion * pesos["calificacion"]
-        + precio     * pesos["precio_hora"]
-        + experiencia * pesos["experiencia_años"]
-        + reviews    * pesos["num_reviews"]
-        + completados * pesos["trabajos_completados"]
+        weights["calificacion"]       * c_norm
+        + weights["reviews_suavizados"] * r_score
+        + weights["badges"]           * b_norm
+        + weights["subcategoria"]     * sub_norm
     )
 
 
-def _rango_precio(precio_hora: int) -> str:
-    if precio_hora < 150:
+# --- Formatting ---
+
+def _to_price_range(price_per_hour: int) -> str:
+    """Converts an hourly rate to a $ symbol tier."""
+    if price_per_hour < 150:
         return "$"
-    if precio_hora < 220:
+    if price_per_hour < 220:
         return "$$"
-    if precio_hora < 280:
+    if price_per_hour < 280:
         return "$$$"
     return "$$$$"
 
 
-def get_top_by_category(categoria: str, limit: int = 10) -> list[dict]:
-    workers, config = load_data()
-    pesos = config
-    norm  = config["_normalizacion"]
+def _to_provider(worker: Worker) -> Provider:
+    """Maps a Worker entry to a typed Provider model."""
+    return Provider(
+        id=worker["id"],
+        nombre=worker["nombre"],
+        categoria=worker["categoria"],
+        rating=worker["calificacion"],
+        badges=worker["subcategorias"],
+        rango_precio=_to_price_range(worker["precio_hora"]),
+        disponibilidad="Disponible ahora",
+    )
 
-    categoria_norm = categoria.lower().strip()
+
+# --- Public API ---
+
+def get_top_by_category(
+    categoria: str,
+    subcategories: list[str] = [],
+    limit: int = 10,
+) -> list[Provider]:
+    """Returns the top-ranked available workers for a given service category.
+
+    Args:
+        categoria:     service category to filter by
+        subcategories: keywords/subcategories from the user's problem description,
+                       used to boost workers that specialize in those areas
+        limit:         max number of results to return (default 10)
+    """
+    workers = load_workers()
+    config  = load_config()
+    norm: NormConfig = config["_normalizacion"]
+
+    normalized_category = categoria.lower().strip()
 
     candidates = [
         w for w in workers
-        if w["categoria"] == categoria_norm and w["disponible"]
+        if w["categoria"] == normalized_category and w["disponible"]
     ]
 
-    ranked = sorted(candidates, key=lambda w: _score(w, pesos, norm), reverse=True)
+    ranked = sorted(
+        candidates,
+        key=lambda w: _calculate_score(w, config, norm, subcategories),
+        reverse=True,
+    )
 
-    return [
-        {
-            "id":            w["id"],
-            "nombre":        w["nombre"],
-            "categoria":     w["categoria"],
-            "rating":        w["calificacion"],
-            "badges":        w["subcategorias"],
-            "rango_precio":  _rango_precio(w["precio_hora"]),
-            "disponibilidad": "Disponible ahora",
-        }
-        for w in ranked[:limit]
-    ]
+    return [_to_provider(w) for w in ranked[:limit]]
 
 
 def get_categories() -> list[str]:
-    workers, config = load_data()
+    """Returns the list of valid service categories."""
+    config = load_config()
     return config.get("_categorias_validas", [])

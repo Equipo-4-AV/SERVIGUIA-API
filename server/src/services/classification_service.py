@@ -5,11 +5,11 @@ from openai import OpenAI
 
 from src.models.classification import ClassificationResult
 from src.repo.task_store import get_task_store
-from src.utils.load import load_data, load_prompt
+from src.utils.load import load_workers, load_config, load_prompt
 
 # ==================== CORE ====================
 
-_, CONFIG = load_data()
+CONFIG = load_config()
 SYSTEM_PROMPT = load_prompt()
 _openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 _store = get_task_store()
