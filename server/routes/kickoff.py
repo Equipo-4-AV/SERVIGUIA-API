@@ -5,12 +5,13 @@ from fastapi import APIRouter, Request, BackgroundTasks
 from pydantic import BaseModel
 from openai import OpenAI
 
-from utils.load import load_data, load_prompt
+from utils.load import load_workers, load_config, load_prompt
 from utils.rate_limiter import limiter
 
 router = APIRouter()
 
-WORKERS, CONFIG = load_data() #!load data to be refactor later
+WORKERS = load_workers()
+CONFIG  = load_config()
 SYSTEM_PROMPT = load_prompt()
 
 
