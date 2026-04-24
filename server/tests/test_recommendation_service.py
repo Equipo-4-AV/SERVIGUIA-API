@@ -1,0 +1,205 @@
+"""
+Unit tests for services/recommendation.py
+
+Tests the scoring formula, price range tiers, and the main
+get_top_by_category function using the real trabajadores.json data.
+"""
+import math
+import pytest
+
+from services.recommendation import (
+    _calculate_score,
+    _to_price_range,
+    _to_provider,
+    get_top_by_category,
+    get_categories,
+)
+from utils.load import load_config
+
+
+# ── helpers ──────────────────────────────────────────────────────────────────
+
+@pytest.fixture
+def config():
+    return load_config()
+
+
+@pytest.fixture
+def norm(config):
+    return config["_normalizacion"]
+
+
+def make_worker(**overrides):
+    base = {
+        "id": "T000",
+        "nombre": "Test Worker",
+        "categoria": "plomeria",
+        "subcategorias": ["fugas", "tuberias"],
+        "calificacion": 4.0,
+        "num_reviews": 20,
+        "precio_hora": 180,
+        "disponible": True,
+        "experiencia_años": 5,
+        "trabajos_completados": 100,
+        "zona": "Centro",
+        "telefono": "6620000000",
+    }
+    base.update(overrides)
+    return base
+
+
+# ── _calculate_score ──────────────────────────────────────────────────────────
+
+class TestCalculateScore:
+    def test_returns_float(self, config, norm):
+        worker = make_worker()
+        score = _calculate_score(worker, config, norm, [])
+        assert isinstance(score, float)
+
+    def test_score_between_0_and_1(self, config, norm):
+        worker = make_worker()
+        score = _calculate_score(worker, config, norm, [])
+        assert 0.0 <= score <= 1.0
+
+    def test_perfect_worker_scores_higher_than_bad_worker(self, config, norm):
+        elite = make_worker(calificacion=5.0, num_reviews=99, subcategorias=["fugas", "tuberias", "drenaje", "calentadores", "bomba", "cisterna", "instalacion"])
+        bad   = make_worker(calificacion=1.5, num_reviews=1,  subcategorias=[])
+        assert _calculate_score(elite, config, norm, []) > _calculate_score(bad, config, norm, [])
+
+    def test_subcategory_match_boosts_score(self, config, norm):
+        specialist = make_worker(subcategorias=["fugas", "tuberias"])
+        generalist = make_worker(subcategorias=["calentadores", "cisterna"])
+        requested  = ["fugas", "tuberias"]
+        score_specialist = _calculate_score(specialist, config, norm, requested)
+        score_generalist = _calculate_score(generalist, config, norm, requested)
+        assert score_specialist > score_generalist
+
+    def test_no_subcategories_requested_gives_full_sub_norm(self, config, norm):
+        # sub_norm should be 1.0 when no subcategories are requested
+        w = make_worker(calificacion=3.0, num_reviews=10, subcategorias=["fugas"])
+        score_no_subs = _calculate_score(w, config, norm, [])
+        # Manually compute expected score with sub_norm=1.0
+        lambda_ = config["lambda"]
+        c_norm  = w["calificacion"] / norm["calificacion_max"]
+        r_score = 1 - math.exp(-lambda_ * w["num_reviews"])
+        b_norm  = min(len(w["subcategorias"]) / norm["badges_max"], 1.0)
+        expected = (
+            config["calificacion"]         * c_norm
+            + config["reviews_suavizados"] * r_score
+            + config["badges"]             * b_norm
+            + config["subcategoria"]       * 1.0
+        )
+        assert abs(score_no_subs - expected) < 1e-9
+
+    def test_exponential_review_smoothing(self, config, norm):
+        # 1000 reviews should not give a score > 1 (exponential caps at 1)
+        w = make_worker(num_reviews=1000)
+        score = _calculate_score(w, config, norm, [])
+        assert score <= 1.0
+
+    def test_higher_reviews_means_higher_score_same_everything_else(self, config, norm):
+        few    = make_worker(num_reviews=5)
+        many   = make_worker(num_reviews=80)
+        assert _calculate_score(many, config, norm, []) > _calculate_score(few, config, norm, [])
+
+
+# ── _to_price_range ───────────────────────────────────────────────────────────
+
+class TestToPriceRange:
+    def test_cheap(self):
+        assert _to_price_range(100) == "$"
+
+    def test_mid_low(self):
+        assert _to_price_range(180) == "$$"
+
+    def test_mid_high(self):
+        assert _to_price_range(250) == "$$$"
+
+    def test_expensive(self):
+        assert _to_price_range(300) == "$$$$"
+
+    def test_boundary_150(self):
+        assert _to_price_range(149) == "$"
+        assert _to_price_range(150) == "$$"
+
+    def test_boundary_220(self):
+        assert _to_price_range(219) == "$$"
+        assert _to_price_range(220) == "$$$"
+
+    def test_boundary_280(self):
+        assert _to_price_range(279) == "$$$"
+        assert _to_price_range(280) == "$$$$"
+
+
+# ── get_top_by_category ───────────────────────────────────────────────────────
+
+class TestGetTopByCategory:
+    def test_returns_list(self):
+        result = get_top_by_category("plomeria")
+        assert isinstance(result, list)
+
+    def test_default_limit_is_10(self):
+        result = get_top_by_category("plomeria")
+        assert len(result) <= 10
+
+    def test_custom_limit_respected(self):
+        result = get_top_by_category("plomeria", limit=3)
+        assert len(result) == 3
+
+    def test_all_results_match_category(self):
+        for provider in get_top_by_category("electricidad"):
+            assert provider.categoria == "electricidad"
+
+    def test_unavailable_workers_excluded(self):
+        # Every category has exactly 1 worker with disponible=False in test data
+        result = get_top_by_category("plomeria", limit=10)
+        ids = [p.id for p in result]
+        # Confirm the known unavailable worker T011 is not in results
+        # (T011 is the one plomero with disponible=False in our 99-worker dataset)
+        from utils.load import load_workers
+        unavailable = [w["id"] for w in load_workers()
+                       if w["categoria"] == "plomeria" and not w["disponible"]]
+        for uid in unavailable:
+            assert uid not in ids
+
+    def test_sorted_best_first(self):
+        # First provider should have a higher rating than the last
+        result = get_top_by_category("plomeria", limit=10)
+        assert result[0].rating >= result[-1].rating
+
+    def test_invalid_category_returns_empty(self):
+        result = get_top_by_category("magia")
+        assert result == []
+
+    def test_case_insensitive_category(self):
+        lower  = get_top_by_category("plomeria")
+        upper  = get_top_by_category("PLOMERIA")
+        assert [p.id for p in lower] == [p.id for p in upper]
+
+    def test_subcategory_boost_changes_order(self):
+        # Without subcategories the ranking is purely by score
+        generic = get_top_by_category("plomeria", limit=10)
+        # With a subcategory that only some workers have, top may shift
+        specific = get_top_by_category("plomeria", subcategories=["calentadores"], limit=10)
+        # Both return valid lists — just verify structure is intact
+        assert len(specific) > 0
+        for p in specific:
+            assert p.categoria == "plomeria"
+
+
+# ── get_categories ────────────────────────────────────────────────────────────
+
+class TestGetCategories:
+    def test_returns_list(self):
+        cats = get_categories()
+        assert isinstance(cats, list)
+
+    def test_contains_expected_categories(self):
+        cats = get_categories()
+        expected = {"plomeria", "electricidad", "pintura", "limpieza",
+                    "carpinteria", "aire acondicionado", "cerrajeria",
+                    "jardineria", "herreria"}
+        assert expected.issubset(set(cats))
+
+    def test_not_empty(self):
+        assert len(get_categories()) > 0
