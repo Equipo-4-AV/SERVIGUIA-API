@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 DATA_DIR = Path(__file__).parent.parent / "data"
+PROMPT_FILE = Path(__file__).parent.parent / "prompts" / "serviapi-v1.txt"
 
 
 def load_data() -> tuple[list[dict], dict]:
@@ -10,9 +11,9 @@ def load_data() -> tuple[list[dict], dict]:
         config = json.load(f)
     return workers, config
 
-def load_prompt(filename="prompts/serviapi-v1.txt"):
+def load_prompt(filename: str | Path = PROMPT_FILE) -> str:
     try:
-        with open(filename, "r", encoding="utf-8") as f:
+        with open(Path(filename), "r", encoding="utf-8") as f:
             return f.read()
     except FileNotFoundError:
-        return 0
+        return ""

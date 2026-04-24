@@ -1,4 +1,4 @@
-from utils.load import load_data
+from src.utils.load import load_data
 
 def _score(worker: dict, pesos: dict, norm: dict) -> float:
     precio_range = norm["precio_hora_max"] - norm["precio_hora_min"]
