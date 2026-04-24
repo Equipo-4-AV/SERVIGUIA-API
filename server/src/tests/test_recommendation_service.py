@@ -7,12 +7,12 @@ get_top_by_category function using the real trabajadores.json data.
 import math
 import pytest
 
-from services.recommendation import (
+from src.services.recommendation import (
     _calculate_score,
     get_top_by_category,
     get_categories,
 )
-from utils.load import load_config
+from src.utils.load import load_config, load_workers
 
 
 # region helpers 
@@ -125,7 +125,6 @@ class TestGetTopByCategory:
         ids = [p.id for p in result]
         # Confirm the known unavailable worker T011 is not in results
         # (T011 is the one plomero with disponible=False in our 99-worker dataset)
-        from utils.load import load_workers
         unavailable = [w["id"] for w in load_workers()
                        if w["categoria"] == "plomeria" and not w["disponible"]]
         for uid in unavailable:

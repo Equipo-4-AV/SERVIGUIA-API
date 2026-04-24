@@ -12,7 +12,7 @@ from src.routes.recommendation_route import router as recommendation_router
 from src.routes.status import router as status_router #!not fully implemented but needed for testing
 from src.routes.enqueue_prompt import router as enqueue_prompt_router
 from src.routes.kickoff import router as kickoff_router
-from src.utils.load import load_prompt
+from src.utils.load import load_config, load_prompt
 
 from src.middlewares.internal_error_handler import InternalErrorHandler
 
@@ -27,6 +27,9 @@ async def lifespan(app: FastAPI):
     #! check if system prompt is loaded
     if not load_prompt():
         raise RuntimeError("System prompt no cargado. Abortando inicio del servidor.")
+    
+    if not load_config():
+        raise RuntimeError("Configuración no cargado. Abortando inicio del servidor.")
 
     yield
 

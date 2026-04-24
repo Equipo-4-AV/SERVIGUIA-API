@@ -44,6 +44,11 @@ Client logs:
 ```bash
 docker compose -f docker/compose.yaml logs -f client
 ```
+### Run Unit Tests
+Run the command in a different terminal while the container is running:
+```bash
+docker exec -it <your-server-docker-image-id>  pytest
+```
 
 > [!TIP]
 > `venv` is Python virtual environment, while `.env` is environment variables file.

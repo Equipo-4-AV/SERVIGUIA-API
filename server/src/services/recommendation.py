@@ -1,6 +1,6 @@
 import math
 
-from src.models.recommendation import Worker, NormConfig, Provider
+from src.models.recommendation import Provider, Worker, NormConfig
 from src.utils.load import load_workers, load_config
 
 

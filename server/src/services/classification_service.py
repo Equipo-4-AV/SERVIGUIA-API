@@ -5,7 +5,7 @@ from openai import OpenAI
 
 from src.models.classification import ClassificationResult
 from src.repo.task_store import get_task_store
-from src.utils.load import load_workers, load_config, load_prompt
+from src.utils.load import load_config, load_prompt
 
 # ==================== CORE ====================
 
@@ -42,7 +42,6 @@ def _call_openai_json(system_content: str, user_text: str) -> dict:
             {"role": "system", "content": system_content},
             {"role": "user", "content": user_text},
         ],
-        temperature=0,
         response_format={"type": "json_object"},
     )
     raw = response.choices[0].message.content
