@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, Query
-from services.recommendation import get_top_by_category, get_categories
+from src.services.recommendation import get_top_by_category, get_categories
 
 router = APIRouter()
 

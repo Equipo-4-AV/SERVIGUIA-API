@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent.parent / "data"
+PROMPT_FILE = Path(__file__).parent.parent / "prompts" / "serviapi-v1.txt"
 
 
 def load_workers() -> list[dict]:
@@ -16,10 +17,9 @@ def load_config() -> dict:
         return json.load(f)
 
 
-def load_prompt(filename="prompts/serviapi-v1.txt"):
-    """Loads the system prompt from a text file. Returns 0 if not found."""
+def load_prompt(filename: str | Path = PROMPT_FILE) -> str:
     try:
-        with open(filename, "r", encoding="utf-8") as f:
+        with open(Path(filename), "r", encoding="utf-8") as f:
             return f.read()
     except FileNotFoundError:
-        return 0
+        return ""

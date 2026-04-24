@@ -1,7 +1,7 @@
 import math
 
-from models.recommendation import Worker, NormConfig, Provider
-from utils.load import load_workers, load_config
+from src.models.recommendation import Provider, Worker, NormConfig
+from src.utils.load import load_workers, load_config
 
 
 # --- Scoring ---

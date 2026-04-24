@@ -22,6 +22,7 @@ Don't worry about hot-loading. Docker Compose uses watch to stablish a sync conn
 
 > [!WARNING]
 > Make sure Docker Desktop is running
+
 ```bash
 docker compose -f docker/compose.yaml watch
 ```
@@ -33,6 +34,7 @@ cp .env.example .env
 ```
 
 If you want to view container logs use the following command
+
 ```bash
 docker compose -f docker/compose.yaml logs -f server
 ```
@@ -42,11 +44,17 @@ Client logs:
 ```bash
 docker compose -f docker/compose.yaml logs -f client
 ```
+### Run Unit Tests
+Run the command in a different terminal while the container is running:
+```bash
+docker exec -it <your-server-docker-image-id>  pytest
+```
 
 > [!TIP]
 > `venv` is Python virtual environment, while `.env` is environment variables file.
 
 ## 📝 Commit Title Types
+
 
 | **Type**   | **Description**                                                                       |
 | ---------- | ------------------------------------------------------------------------------------- |
@@ -61,5 +69,7 @@ docker compose -f docker/compose.yaml logs -f client
 | `ops`      | Changes related to **operations** like deployment, infrastructure, or scripts         |
 | `chore`    | Miscellaneous tasks (e.g., updating `.gitignore`, non-functional maintenance)         |
 
+
 > [!NOTE]
 > Also accepts compound titles like feat&fix
+
