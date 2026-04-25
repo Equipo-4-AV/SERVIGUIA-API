@@ -123,8 +123,7 @@ class TestGetTopByCategory:
         # Every category has exactly 1 worker with disponible=False in test data
         result = get_top_by_category("plomeria", limit=10)
         ids = [p.id for p in result]
-        # Confirm the known unavailable worker T011 is not in results
-        # (T011 is the one plomero with disponible=False in our 99-worker dataset)
+        # Confirm unavailable plomeros are excluded (T010 is disponible=False)
         unavailable = [w["id"] for w in load_workers()
                        if w["categoria"] == "plomeria" and not w["disponible"]]
         for uid in unavailable:
@@ -145,14 +144,40 @@ class TestGetTopByCategory:
         assert [p.id for p in lower] == [p.id for p in upper]
 
     def test_subcategory_boost_changes_order(self):
-        # Without subcategories the ranking is purely by score
-        generic = get_top_by_category("plomeria", limit=10)
-        # With a subcategory that only some workers have, top may shift
-        specific = get_top_by_category("plomeria", subcategories=["calentadores"], limit=10)
-        # Both return valid lists — just verify structure is intact
-        assert len(specific) > 0
-        for p in specific:
-            assert p.categoria == "plomeria"
+        from unittest.mock import patch
+
+        def w(id, cal, rev, subs):
+            return {
+                "id": id, "nombre": f"Worker {id}", "categoria": "plomeria",
+                "subcategorias": subs, "calificacion": cal, "num_reviews": rev,
+                "precio_hora": 180, "disponible": True, "experiencia_años": 5,
+                "trabajos_completados": 100, "zona": "Centro", "telefono": "6620000000",
+            }
+
+        # 5 workers WITHOUT calentadores — higher base scores, dominate generic ranking
+        # 5 workers WITH calentadores — lower base scores, rise to top when boost applies
+        workers = [
+            w("T_01", 4.6, 65, ["fugas", "tuberias", "drenaje"]),
+            w("T_02", 4.4, 50, ["calentadores", "cisterna"]),
+            w("T_03", 4.5, 55, ["fugas", "instalacion sanitaria"]),
+            w("T_04", 4.3, 45, ["calentadores", "hidroneumatico"]),
+            w("T_05", 4.4, 48, ["drenaje", "bomba de agua"]),
+            w("T_06", 4.2, 40, ["calentadores", "fugas", "tuberias"]),
+            w("T_07", 4.1, 35, ["instalacion sanitaria", "tuberias"]),
+            w("T_08", 4.0, 30, ["calentadores"]),
+            w("T_09", 3.8, 25, ["fugas"]),
+            w("T_10", 3.6, 20, ["calentadores", "cisterna", "drenaje"]),
+        ]
+
+        with patch("src.services.recommendation.load_workers", return_value=workers):
+            generic  = get_top_by_category("plomeria", limit=10)
+            specific = get_top_by_category("plomeria", subcategories=["calentadores"], limit=10)
+
+        # Without boost: T_01 wins (best base score — high rating + many reviews)
+        assert generic[0].id == "T_01"
+        # With calentadores boost: T_02 jumps to first (non-calentadores workers drop to sub_norm=0)
+        assert specific[0].id == "T_02"
+        assert [p.id for p in generic] != [p.id for p in specific]
 
 
 # region get_categories 
