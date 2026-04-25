@@ -31,7 +31,6 @@ def _normalize_subcategory_mapping(config: dict) -> dict[str, list[str]]:
 
 
 def _build_classifier_system_content(system_prompt: str, config: dict, subcategory_mapping: dict) -> str:
-    valid_categories = config.get("_categorias_validas", [])
     return (
         f"{system_prompt}\n"
         f"SUBCATEGORÍAS VÁLIDAS POR CATEGORÍA (Tareas/Problemas):\n"
@@ -93,7 +92,7 @@ def run_classification(task_id: str, user_text: str) -> None:
 
         task_data = _store.get(task_id)
         if task_data.get("status") == "not_found":
-            _store.set_failed(task_id, "task_id no encontrado en el store")
+            _store.set_failed(task_id, "task_id not found in store")
             return
         history = task_data.get("history", [])
         attempts = task_data.get("attempts", 0)
