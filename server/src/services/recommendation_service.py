@@ -72,9 +72,9 @@ def _to_service_provider(worker: Raw_Worker) -> Service_Provider:
 
 
 # --- Public API ---
-
-def get_top_by_category(
-    categoria: str,
+# region recommend function
+def get_top_by_category_and_subs(
+    category: str,
     subcategories: list[str] = [],
     limit: int = 10,
 ) -> list[Service_Provider]:
@@ -90,7 +90,7 @@ def get_top_by_category(
     config  = load_config()
     norm: NormConfig = config["_normalizacion"]
 
-    normalized_category = categoria.lower().strip()
+    normalized_category = category.lower().strip()
 
     candidates = [
         w for w in workers

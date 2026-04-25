@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Request
 from src.repo.task_store import tasks_db
-from src.utils.rate_limiter import limiter
+from src.middlewares.rate_limiter import limiter
 
 router = APIRouter()
 

@@ -1,6 +1,12 @@
+from src.services.recommendation_service import get_top_by_category_and_subs
+from src.models.classification_result import ClassificationResult
+from src.models.service_provider import Service_Provider
+
 tasks_db: dict[str, dict] = {}
 
-
+#TODO:
+#- standerize status values in an enum
+#? standerize dictionary indexes?
 class InMemoryTaskStore:
 
 
@@ -36,6 +42,16 @@ class InMemoryTaskStore:
             self._data[task_id]["message"] = message
             self._data[task_id]["history"] = history
             self._data[task_id]["attempts"] = attempts
+
+    #! storing the providers recommended will prevent running the recommendation system everytime output is called
+    # also, result atribute will not be affected in case it will always represent category and subcategories classification
+    def set_providers(self, task_id: str):
+        if task_id:
+            classification = self._data[task_id]["result"] #classification is a dict using ClassificationResult aliases
+            self._data[task_id]["providers"] = get_top_by_category_and_subs(
+                category = classification["categoria"],
+                subcategories = [classification["subcategoria"]] #TODO make system prompt do an array of subcategories
+                    )
 
     def has(self, task_id: str) -> bool:
         return task_id in self._data

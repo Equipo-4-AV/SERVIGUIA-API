@@ -5,12 +5,12 @@ from fastapi.exceptions import RequestValidationError
 #rate limiting
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
-from src.utils.rate_limiter import limiter
+from src.middlewares.rate_limiter import limiter
 
-from src.routes.recommendation_route import router as recommendation_router
 from src.routes.status import router as status_router #!not fully implemented but needed for testing
 from src.routes.enqueue_prompt import router as enqueue_prompt_router
 from src.routes.kickoff import router as kickoff_router
+from src.routes.output import router as output_router
 from src.utils.load import load_config, load_prompt
 
 #middleware
@@ -56,10 +56,11 @@ def read_api(request : Request):
     return {"message": f"From these routes, we receive data via push notifications from {os.getenv('CLIENT_APP')}"}
 
 #region routers
-app.include_router(recommendation_router, prefix="/api")
 app.include_router(status_router, prefix="/api")
+app.include_router(output_router, prefix="/api")
 app.include_router(kickoff_router, prefix="/api")
 app.include_router(enqueue_prompt_router, prefix="/api")
+
 
 @app.exception_handler(RequestValidationError)
 async def handle_422(request: Request, exc: RequestValidationError):

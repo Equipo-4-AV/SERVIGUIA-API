@@ -3,9 +3,9 @@ from typing import Annotated
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 
 from src.repo.task_store import InMemoryTaskStore, get_task_store
-from src.models.prompt import PromptRequest
+from src.models.prompt_request import PromptRequest
 from src.services.classification_service import run_classification
-from src.utils.rate_limiter import limiter
+from src.middlewares.rate_limiter import limiter
 
 router = APIRouter()
 

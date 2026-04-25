@@ -3,7 +3,7 @@ import os
 
 from openai import OpenAI
 
-from src.models.classification import ClassificationResult
+from src.models.classification_result import ClassificationResult
 from src.repo.task_store import get_task_store
 from src.utils.load import load_config, load_prompt
 
@@ -134,6 +134,8 @@ def run_classification(task_id: str, user_text: str) -> None:
 
         output_payload = final_result.model_dump(by_alias=True)
         _store.set_completed(task_id, output_payload)
+
+        _store.set_providers(task_id)
 
     except Exception as e:
         _store.set_failed(task_id, str(e))
