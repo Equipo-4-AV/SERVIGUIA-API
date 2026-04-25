@@ -40,13 +40,12 @@ def _build_classifier_system_content(system_prompt: str, config: dict, subcatego
     )
 
 
-def _call_openai_json(system_content: str, user_text: str) -> dict:
+def _call_openai_json(system_content: str, history: list[dict]) -> dict:
+    messages = [{"role": "system", "content": system_content}] + history
+
     response = _openai_client.chat.completions.create(
         model="gpt-5-nano",
-        messages=[
-            {"role": "system", "content": system_content},
-            {"role": "user", "content": user_text},
-        ],
+        messages=messages,
         response_format={"type": "json_object"},
     )
     raw = response.choices[0].message.content
@@ -82,8 +81,6 @@ def _post_process_classification(
 # ==================== MAIN SERVICE ====================
 
 
-# ==================== MAIN SERVICE ====================
-
 def run_classification(task_id: str, user_text: str) -> None:
     try:
         if not isinstance(CONFIG, dict) or not CONFIG:
@@ -94,16 +91,47 @@ def run_classification(task_id: str, user_text: str) -> None:
             _store.set_failed(task_id, "SYSTEM_PROMPT is missing or invalid")
             return
 
+        task_data = _store.get(task_id)
+        if task_data.get("status") == "not_found":
+            _store.set_failed(task_id, "task_id no encontrado en el store")
+            return
+        history = task_data.get("history", [])
+        attempts = task_data.get("attempts", 0)
+
+        history.append({"role": "user", "content": user_text})
+
         valid_categories = CONFIG.get("_categorias_validas", [])
         subcategory_mapping = _normalize_subcategory_mapping(CONFIG)
         system_content = _build_classifier_system_content(SYSTEM_PROMPT, CONFIG, subcategory_mapping)
-        raw_ai_result = _call_openai_json(system_content, user_text)
+
+        raw_ai_result = _call_openai_json(system_content, history)
 
         final_result = _post_process_classification(
             ai_result=raw_ai_result,
             valid_categories=valid_categories,
             subcategory_mapping=subcategory_mapping
         )
+
+        # Context logic
+        if final_result.category == "unknown" or final_result.subcategory == "unknown":
+            attempts += 1
+
+            if attempts >= 3:
+                _store.set_failed(
+                    task_id,
+                    "Cancelado: No pudimos clasificar tu problema después de 3 intentos. Por favor, reinicia el proceso."
+                )
+                return
+
+            clarification_msg = "No me quedó muy claro tu problema. ¿Podrías ser un poco más específico sobre el servicio o la falla que presentas?"
+            history.append({"role": "assistant", "content": clarification_msg})
+            _store.set_requires_clarification(
+                task_id=task_id,
+                message=clarification_msg,
+                history=history,
+                attempts=attempts
+            )
+            return
 
         output_payload = final_result.model_dump(by_alias=True)
         _store.set_completed(task_id, output_payload)
