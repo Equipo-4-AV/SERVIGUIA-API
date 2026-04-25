@@ -1,9 +1,11 @@
 from pydantic import BaseModel, ConfigDict
 
 
-class ClassificationResult(BaseModel):
-    categoria: str = "desconocido"
-    es_emergencia: bool = False
-    mensaje_seguridad: str | None = None
+from pydantic import BaseModel, ConfigDict, Field
 
-    model_config = ConfigDict(extra="allow")
+class ClassificationResult(BaseModel):
+    category: str = Field(default="unknown", alias="categoria")
+    subcategory: str = Field(default="unknown", alias="subcategoria")
+    is_emergency: bool = Field(default=False, alias="es_emergencia")
+    safety_message: str | None = None  # Variable interna, no viene del LLM
+    model_config = ConfigDict(extra="allow", populate_by_name=True)

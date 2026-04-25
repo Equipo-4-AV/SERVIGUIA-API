@@ -19,8 +19,17 @@ async def enqueue_prompt_classification(
     task_id: str
 ) -> dict[str, str | bool]:
     if not store.has(task_id):
-        store.set_failed(task_id, "task_id no encontrado")
-        raise HTTPException(status_code=404, detail="task_id no encontrado")
+        store.set_failed(task_id, "task_id not found in store")
+        raise HTTPException(status_code=404, detail="task_id not found in store")
+
+    task_data = store.get(task_id)
+    current_status = task_data.get("status")
+
+    if current_status == "completed":
+        return {"task_id": task_id, "enqueued": True, "detail": "result is ready in corresponding endpoint"}
+
+    elif current_status not in ["requires_clarification", "starting"]:
+        return {"task_id": task_id, "enqueued": True, "detail": "service is processing"}
 
     store.set_processing(task_id)
     background_tasks.add_task(run_classification, task_id, data.context)
