@@ -123,8 +123,7 @@ class TestGetTopByCategory:
         # Every category has exactly 1 worker with disponible=False in test data
         result = get_top_by_category("plomeria", limit=10)
         ids = [p.id for p in result]
-        # Confirm the known unavailable worker T011 is not in results
-        # (T011 is the one plomero with disponible=False in our 99-worker dataset)
+        # Confirm unavailable plomeros are excluded (T010 is disponible=False)
         unavailable = [w["id"] for w in load_workers()
                        if w["categoria"] == "plomeria" and not w["disponible"]]
         for uid in unavailable:
@@ -145,14 +144,34 @@ class TestGetTopByCategory:
         assert [p.id for p in lower] == [p.id for p in upper]
 
     def test_subcategory_boost_changes_order(self):
-        # Without subcategories the ranking is purely by score
-        generic = get_top_by_category("plomeria", limit=10)
-        # With a subcategory that only some workers have, top may shift
-        specific = get_top_by_category("plomeria", subcategories=["calentadores"], limit=10)
-        # Both return valid lists — just verify structure is intact
-        assert len(specific) > 0
-        for p in specific:
-            assert p.categoria == "plomeria"
+        from unittest.mock import patch
+
+        # Two workers with similar base stats; B has a slightly better rating/reviews
+        # so B ranks first generically — but A is the only one covering "calentadores"
+        worker_a = {
+            "id": "T_A", "nombre": "Worker A", "categoria": "plomeria",
+            "subcategorias": ["calentadores"],
+            "calificacion": 4.0, "num_reviews": 20, "precio_hora": 180,
+            "disponible": True, "experiencia_años": 5,
+            "trabajos_completados": 100, "zona": "Centro", "telefono": "6620000001",
+        }
+        worker_b = {
+            "id": "T_B", "nombre": "Worker B", "categoria": "plomeria",
+            "subcategorias": ["fugas", "tuberias"],
+            "calificacion": 4.5, "num_reviews": 30, "precio_hora": 180,
+            "disponible": True, "experiencia_años": 5,
+            "trabajos_completados": 100, "zona": "Centro", "telefono": "6620000002",
+        }
+
+        with patch("src.services.recommendation.load_workers", return_value=[worker_a, worker_b]):
+            generic  = get_top_by_category("plomeria", limit=10)
+            specific = get_top_by_category("plomeria", subcategories=["calentadores"], limit=10)
+
+        # Without boost: B wins (higher rating + more reviews)
+        assert generic[0].id == "T_B"
+        # With calentadores boost: A jumps to first (B gets sub_norm=0)
+        assert specific[0].id == "T_A"
+        assert [p.id for p in generic] != [p.id for p in specific]
 
 
 # region get_categories 
