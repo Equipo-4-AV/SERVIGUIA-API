@@ -1,13 +1,15 @@
 import math
 
-from src.models.recommendation import Provider, Worker, NormConfig
-from src.utils.load import load_workers, load_config
+from src.models.service_provider import Service_Provider
+from src.models.norm_config import NormConfig
+from src.models.raw_worker import Raw_Worker
 
+from src.utils.load import load_workers, load_config
 
 # --- Scoring ---
 
 def _calculate_score(
-    worker: Worker,
+    worker: Raw_Worker,
     weights: dict,
     norm: NormConfig,
     subcategories: list[str],
@@ -56,16 +58,16 @@ def _to_price_range(price_per_hour: int) -> str:
     return "$$$$"
 
 
-def _to_provider(worker: Worker) -> Provider:
+def _to_service_provider(worker: Raw_Worker) -> Service_Provider:
     """Maps a Worker entry to a typed Provider model."""
-    return Provider(
+    return Service_Provider(
         id=worker["id"],
-        nombre=worker["nombre"],
-        categoria=worker["categoria"],
+        name=worker["nombre"],
+        category=worker["categoria"],
         rating=worker["calificacion"],
         badges=worker["subcategorias"],
-        rango_precio=_to_price_range(worker["precio_hora"]),
-        disponibilidad="Disponible ahora",
+        price_evaluation=_to_price_range(worker["precio_hora"]),
+        available="Disponible ahora",
     )
 
 
@@ -75,7 +77,7 @@ def get_top_by_category(
     categoria: str,
     subcategories: list[str] = [],
     limit: int = 10,
-) -> list[Provider]:
+) -> list[Service_Provider]:
     """Returns the top-ranked available workers for a given service category.
 
     Args:
@@ -101,7 +103,7 @@ def get_top_by_category(
         reverse=True,
     )
 
-    return [_to_provider(w) for w in ranked[:limit]]
+    return [_to_service_provider(w) for w in ranked[:limit]]
 
 
 def get_categories() -> list[str]:

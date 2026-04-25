@@ -47,7 +47,7 @@ docker compose -f docker/compose.yaml logs -f client
 ### Run Unit Tests
 Run the command in a different terminal while the container is running:
 ```bash
-docker exec -it <your-server-docker-image-id>  pytest
+docker exec -it <your-server-docker-container-id>  pytest
 ```
 
 > [!TIP]

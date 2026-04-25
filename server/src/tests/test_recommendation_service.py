@@ -117,7 +117,7 @@ class TestGetTopByCategory:
 
     def test_all_results_match_category(self):
         for provider in get_top_by_category("electricidad"):
-            assert provider.categoria == "electricidad"
+            assert provider.category == "electricidad"
 
     def test_unavailable_workers_excluded(self):
         # Every category has exactly 1 worker with disponible=False in test data
@@ -152,7 +152,7 @@ class TestGetTopByCategory:
         # Both return valid lists — just verify structure is intact
         assert len(specific) > 0
         for p in specific:
-            assert p.categoria == "plomeria"
+            assert p.category == "plomeria"
 
 
 # region get_categories 

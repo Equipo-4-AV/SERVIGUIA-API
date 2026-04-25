@@ -1,5 +1,4 @@
 import os
-from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 
@@ -14,27 +13,14 @@ from src.routes.enqueue_prompt import router as enqueue_prompt_router
 from src.routes.kickoff import router as kickoff_router
 from src.utils.load import load_config, load_prompt
 
+#middleware
 from src.middlewares.internal_error_handler import InternalErrorHandler
+from src.middlewares.lifespan import lifespan_handler
 
 project_name = "ServiAPI"
 
-#region APIKEY check
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    #! check if .env contains key
-    if not os.getenv("OPENAI_API_KEY"): #? Log errors in english?
-        raise RuntimeError("OPENAI_API_KEY no configurada. Abortando inicio del servidor.")
-    #! check if system prompt is loaded
-    if not load_prompt():
-        raise RuntimeError("System prompt no cargado. Abortando inicio del servidor.")
-    
-    if not load_config():
-        raise RuntimeError("Configuración no cargado. Abortando inicio del servidor.")
-
-    yield
-
 app = FastAPI(
-    lifespan = lifespan,
+    lifespan = lifespan_handler,
     title = project_name,
     description = f"""
 *{project_name}*
@@ -78,5 +64,4 @@ app.include_router(enqueue_prompt_router, prefix="/api")
 @app.exception_handler(RequestValidationError)
 async def handle_422(request: Request, exc: RequestValidationError):
     body = await request.body()
-    print("422 Error. Body was:", body.decode())
     return {"status_code" : 422, "detail": "Invalid data"}
