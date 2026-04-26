@@ -7,7 +7,6 @@ from src.middlewares.rate_limiter import limiter
 from src.repo.task_store import InMemoryTaskStore, get_task_store
 from src.services.classification_service import run_classification
 
-from src.models.prompt_request import PromptRequest
 from src.models.task_status_enum import Status
 
 router = APIRouter()
