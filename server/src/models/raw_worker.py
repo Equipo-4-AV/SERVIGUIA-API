@@ -5,6 +5,7 @@ Raw_Worker = TypedDict("Raw_Worker", {
     "nombre": str,
     "categoria": str,
     "subcategorias": list[str],
+    "insignias": list[str],
     "calificacion": float,
     "num_reviews": int,
     "precio_hora": int,

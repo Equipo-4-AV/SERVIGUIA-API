@@ -28,7 +28,8 @@ def _calculate_score(
 
     c_norm   = worker["calificacion"] / norm["calificacion_max"]
     r_score  = 1 - math.exp(-lambda_ * worker["num_reviews"])
-    b_norm   = min(len(worker["subcategorias"]) / norm["badges_max"], 1.0)
+    worker_insignias = worker.get("insignias", [])
+    b_norm = min(len(worker_insignias) / norm.get("badges_max", 1), 1.0)
 
     if subcategories:
         worker_subs   = {s.lower() for s in worker["subcategorias"]}
@@ -66,6 +67,7 @@ def _to_service_provider(worker: Raw_Worker) -> Service_Provider:
         category=worker["categoria"],
         rating=worker["calificacion"],
         subcategories=worker["subcategorias"],
+        badges=worker["insignias"],
         price_evaluation=_to_price_range(worker["precio_hora"]),
         available="Disponible ahora",
     )
