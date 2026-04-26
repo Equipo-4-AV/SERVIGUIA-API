@@ -1,58 +1,88 @@
-import type { ChatMessage, DiagnosisRequest, DiagnosisResponse } from "@/types";
-import { apiConfig, isRealMode } from "./client";
-import { mockRequestDiagnosis } from "./mockService";
-import { realRequestDiagnosis } from "./backendService";
-import { ApiStepError, apiErrorFromUnknown, setIntegrationDebug } from "./debug";
+import axios from "axios";
+import type { StatusResponse, OutputResponse } from "@/types";
+
+// ============================================================================
+// Configuración base de Axios
+// ============================================================================
+
+const baseURL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+
+export const apiClient = axios.create({
+  baseURL,
+  headers: {
+    "Content-Type": "application/json",
+  },
+});
+
+// ============================================================================
+// Funciones del API (Mapeo directo a los endpoints de Python)
+// ============================================================================
 
 /**
- * Single unified entry point for the UI. Components should never know whether
- * data comes from the mock service or the real backend — that decision lives
- * here based on the .env configuration.
- *
- * In real mode, network failures are surfaced as errors so the UI can show a
- * proper error state. We deliberately do NOT silently fall back to mock data
- * in real mode (that would mask backend issues during integration).
- * Mock mode is fully offline and never attempts a fetch.
+ * 1. POST /api/kickoff
+ * Crea una nueva tarea (conversación) en el backend y devuelve el task_id.
  */
-export interface RequestOptions {
-  /** Reuse an existing task across conversation turns (real mode only). */
-  taskId?: string;
-  signal?: AbortSignal;
+export async function startKickoff(signal?: AbortSignal): Promise<string> {
+  const response = await apiClient.post<{ task_id: string }>(
+    "/api/kickoff",
+    {},
+    { signal }
+  );
+  return response.data.task_id;
 }
 
-export interface RequestResult {
-  data: DiagnosisResponse;
-  source: "api" | "mock";
-  /** taskId for the conversation. In mock mode this is a stable local id. */
-  taskId: string;
-}
-
-export async function requestDiagnosis(
-  req: DiagnosisRequest,
-  options: RequestOptions = {},
-): Promise<RequestResult> {
-  try {
-    if (isRealMode()) {
-      const { data, taskId } = await realRequestDiagnosis(req, options);
-      return { data, source: "api", taskId };
-    }
-    const data = await mockRequestDiagnosis(req);
-    return { data, source: "mock", taskId: options.taskId ?? "mock-task" };
-  } catch (error) {
-    if (error instanceof ApiStepError) {
-      setIntegrationDebug(error.payload);
-      throw error;
-    }
-    const wrapped = apiErrorFromUnknown(isRealMode() ? "status polling" : "mock", error);
-    setIntegrationDebug(wrapped.payload);
-    throw wrapped;
+/**
+ * 2. POST /api/prompt/{task_id}
+ * Encola el mensaje de texto del usuario (y opcionalmente una imagen) para
+ * que sea procesado por el Agente.
+ */
+export async function sendPrompt(
+  taskId: string,
+  text: string,
+  image: File | null = null,
+  signal?: AbortSignal
+): Promise<void> {
+  const formData = new FormData();
+  
+  // ¡CRÍTICO! El backend espera el "context" como texto plano, NO como un JSON con el historial.
+  formData.append("context", text);
+  
+  if (image) {
+    formData.append("image", image);
   }
+
+  await apiClient.post(`/api/prompt/${taskId}`, formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+    signal,
+  });
 }
 
-export function historyFromMessages(messages: ChatMessage[]) {
-  return messages.map((m) => ({ role: m.role, text: m.text }));
+/**
+ * 3. GET /api/status/{task_id}
+ * Obtiene el estado actual de la tarea. Se usa para hacer polling.
+ */
+export async function getStatus(
+  taskId: string,
+  signal?: AbortSignal
+): Promise<StatusResponse> {
+  const response = await apiClient.get<StatusResponse>(`/api/status/${taskId}`, {
+    signal,
+  });
+  return response.data;
 }
 
-export { apiConfig };
-export { isRealMode, API_MODE, API_BASE_URL, POLLING_INTERVAL_MS } from "./client";
-export { getLatestIntegrationDebug } from "./debug";
+/**
+ * 4. GET /api/output/{task_id}
+ * Obtiene el resultado final y los proveedores recomendados.
+ */
+export async function getOutput(
+  taskId: string,
+  signal?: AbortSignal
+): Promise<OutputResponse> {
+  const response = await apiClient.get<OutputResponse>(`/api/output/${taskId}`, {
+    signal,
+  });
+  return response.data;
+}

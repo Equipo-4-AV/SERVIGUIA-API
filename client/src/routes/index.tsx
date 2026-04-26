@@ -1,9 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useState } from "react";
 import { Coins, Search, AlertCircle, ArrowLeft, MessageSquare, Lock } from "lucide-react";
-import type { ChatMessage, DiagnosisResponse, IntegrationDebugPayload } from "@/types";
 import { Chat } from "@/components/Chat";
-import { DevJsonButton } from "@/components/DevJsonButton";
 import { CreditsContext } from "@/contexts/CreditsContext";
 import logo from "@/assets/logo.png";
 
@@ -16,9 +14,6 @@ const INITIAL_CREDITS = 10;
 const CONTACT_COST = 5;
 
 function Index() {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [lastDiagnosis, setLastDiagnosis] = useState<DiagnosisResponse | null>(null);
-  const [lastDebug, setLastDebug] = useState<IntegrationDebugPayload | null>(null);
   const [credits, setCredits] = useState<number>(INITIAL_CREDITS);
   const [chatUnlocked, setChatUnlocked] = useState(false);
   const [gateError, setGateError] = useState<string | null>(null);
@@ -119,19 +114,9 @@ function Index() {
             </div>
           </div>
         ) : chatUnlocked ? (
-          <>
-            <div className="flex flex-1 flex-col">
-              <Chat
-                messages={messages}
-                setMessages={setMessages}
-                onDiagnosis={(d) => setLastDiagnosis(d)}
-                onDebug={setLastDebug}
-              />
-            </div>
-            <div className="flex justify-end px-4 py-2">
-              <DevJsonButton data={lastDiagnosis} debug={lastDebug} />
-            </div>
-          </>
+          <div className="flex flex-1 flex-col">
+            <Chat />
+          </div>
         ) : (
           <div className="flex flex-1 flex-col items-center justify-center px-6 py-10 text-center">
             <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-primary/10 text-primary">
