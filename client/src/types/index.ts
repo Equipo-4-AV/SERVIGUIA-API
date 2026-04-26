@@ -77,3 +77,82 @@ export interface DiagnosisRequest {
   image?: File | null;
   history: { role: "user" | "assistant"; text: string }[];
 }
+
+// ---------------------------------------------------------------------------
+// Backend contract (real mode) — mirrors the FastAPI service shape.
+// The UI never consumes these directly: the backend service maps them into
+// the existing DiagnosisResponse shape so components stay untouched.
+// ---------------------------------------------------------------------------
+
+export type BackendStatus =
+  | "starting"
+  | "processing"
+  | "completed"
+  | "failed"
+  | "requires_clarification"
+  | "not_found";
+
+export interface KickoffResponse {
+  task_id: string;
+}
+
+export interface PromptResponse {
+  task_id: string;
+  enqueued: boolean;
+  detail?: string;
+}
+
+export interface BackendHistoryItem {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export interface DiagnosisResult {
+  categoria: string | null;
+  subcategoria: string[] | null;
+  es_emergencia: boolean;
+  safety_message: string | null;
+}
+
+export interface StatusResponse {
+  status: BackendStatus;
+  history?: BackendHistoryItem[];
+  attempts?: number;
+  result?: DiagnosisResult | null;
+  error?: string;
+}
+
+export interface BackendProvider {
+  id: string;
+  name: string;
+  category: string;
+  rating: number;
+  subcategories: string[];
+  price_evaluation: string;
+  available: string;
+}
+
+export interface OutputResponse {
+  status: BackendStatus;
+  providers: BackendProvider[];
+}
+
+export type ApiDebugStep =
+  | "mode detection"
+  | "mock"
+  | "kickoff"
+  | "prompt"
+  | "status polling"
+  | "output fetch";
+
+export interface IntegrationDebugPayload {
+  mode: "mock" | "real";
+  step: ApiDebugStep;
+  message: string;
+  endpoint?: string;
+  statusCode?: number;
+  responseBody?: string;
+  taskId?: string;
+  baseUrl?: string;
+  timestamp: string;
+}

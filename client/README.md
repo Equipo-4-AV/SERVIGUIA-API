@@ -1,4 +1,4 @@
-# ServiGuía Demo
+# ServiApp Demo
 
 Frontend demo for a home-services diagnosis assistant. Built with React + TypeScript + Vite + Tailwind, ready to connect to a Python (FastAPI) REST API.
 
