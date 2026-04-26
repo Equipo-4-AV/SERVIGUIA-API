@@ -58,8 +58,6 @@ def _post_process_classification(
 ) -> ClassificationResult:
 
     parsed_result = ClassificationResult.model_validate(ai_result)
-    print(ai_result)
-    print(parsed_result)
 
     if parsed_result.is_emergency is True:
         parsed_result.safety_message = (
