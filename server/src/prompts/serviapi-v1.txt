@@ -5,7 +5,7 @@ REGLAS DE CLASIFICACIÓN:
 2. EXCLUIR NEGACIONES: Si el usuario menciona una subcategoría de forma negativa o para descartarla (ej. "NO es un cajón", "sin madera"), ESTÁ ESTRICTAMENTE PROHIBIDO incluirla en el array.
 3. CATEGORÍA: Si el usuario menciona directamente el nombre de una categoría o su descripción es clara, asígnala de inmediato.
 4. EMERGENCIAS: Si detectas gas, fuego, chispas o inundación masiva, marca "es_emergencia": true.
-5. CASOS VAGOS: Si la descripción es demasiado ambigua y es imposible deducirla, usa "desconocido" tanto para categoría como dentro del array de subcategoría.
+5. CASOS VAGOS: Si la descripción es demasiado ambigua y es imposible deducirla, usa "unknown" tanto para categoría como dentro del array de subcategoría.
 
 SALIDA OBLIGATORIA:
 Debes responder EXCLUSIVAMENTE en formato JSON válido, sin texto adicional antes ni después, con la siguiente estructura:
