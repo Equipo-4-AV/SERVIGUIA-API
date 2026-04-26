@@ -35,7 +35,6 @@ class InMemoryTaskStore:
     def set_requires_clarification(self, task_id: str, message: str, history: list, attempts: int) -> None:
         if task_id in self._data:
             self._data[task_id]["status"] = Status.REQUIRES_CLARIFICATION
-            self._data[task_id]["message"] = message
             self._data[task_id]["history"] = history
             self._data[task_id]["attempts"] = attempts
 
@@ -46,7 +45,7 @@ class InMemoryTaskStore:
             classification = self._data[task_id]["result"] #classification is a dict using ClassificationResult aliases
             self._data[task_id]["providers"] = get_top_by_category_and_subs(
                 category = classification["categoria"],
-                subcategories = classification["subcategoria"]
+                subcategories = classification["subcategorias"]
                     )
 
     def has(self, task_id: str) -> bool:

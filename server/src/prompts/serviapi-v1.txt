@@ -12,6 +12,6 @@ SALIDA OBLIGATORIA:
 Debes responder EXCLUSIVAMENTE en formato JSON válido, sin Markdown, sin backticks (```) y sin texto adicional antes ni después, con esta estructura exacta:
 {
   "categoria": "nombre_de_la_categoria",
-  "subcategoria": ["coincidencia_1", "coincidencia_2"],
+  "subcategorias": ["coincidencia_1", "coincidencia_2"],
   "es_emergencia": boolean
 }

@@ -21,14 +21,15 @@ def _calculate_score(
     - C_norm:   normalized rating (calificacion / 5)
     - 1-e^(-λR): exponential smoothing over number of reviews — avoids
                  unfair advantage for workers with very high review counts
-    - B_norm:   worker's total subcategories normalized by max possible badges
+    - B_norm:   worker's total subcategories normalized by max possible subcategories
     - Sub_norm: proportion of requested subcategories the worker covers
     """
     lambda_ = weights["lambda"]
 
     c_norm   = worker["calificacion"] / norm["calificacion_max"]
     r_score  = 1 - math.exp(-lambda_ * worker["num_reviews"])
-    b_norm   = min(len(worker["subcategorias"]) / norm["badges_max"], 1.0)
+    worker_insignias = worker.get("insignias", [])
+    b_norm = min(len(worker_insignias) / norm.get("badges_max", 1), 1.0)
 
     if subcategories:
         worker_subs   = {s.lower() for s in worker["subcategorias"]}
@@ -41,7 +42,7 @@ def _calculate_score(
         weights["calificacion"]       * c_norm
         + weights["reviews_suavizados"] * r_score
         + weights["badges"]           * b_norm
-        + weights["subcategoria"]     * sub_norm
+        + weights["subcategorias"]     * sub_norm
     )
 
 
@@ -65,7 +66,8 @@ def _to_service_provider(worker: Raw_Worker) -> Service_Provider:
         name=worker["nombre"],
         category=worker["categoria"],
         rating=worker["calificacion"],
-        badges=worker["subcategorias"],
+        subcategories=worker["subcategorias"],
+        badges=worker["insignias"],
         price_evaluation=_to_price_range(worker["precio_hora"]),
         available="Disponible ahora",
     )
