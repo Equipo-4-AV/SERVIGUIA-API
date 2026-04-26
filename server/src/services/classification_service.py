@@ -9,15 +9,10 @@ from src.utils.load import load_config, load_prompt
 from src.models.task_status_enum import Status
 from src.models.classification_result import ClassificationResult
 
-# ==================== CORE ====================
-
 CONFIG = load_config()
 SYSTEM_PROMPT = load_prompt()
 _openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 _store = get_task_store()
-
-
-# ==================== UTILS ====================
 
 def _normalize_subcategory_mapping(config: dict) -> dict[str, list[str]]:
     mapping = {}
@@ -31,7 +26,6 @@ def _normalize_subcategory_mapping(config: dict) -> dict[str, list[str]]:
 
     return mapping
 
-
 def _build_classifier_system_content(system_prompt: str, config: dict, subcategory_mapping: dict) -> str:
     return (
         f"{system_prompt}\n"
@@ -40,18 +34,17 @@ def _build_classifier_system_content(system_prompt: str, config: dict, subcatego
         "REGLA ESTRICTA: Debes seleccionar exactamente una subcategoría de las listas anteriores. No inventes subcategorías."
     )
 
-
 def _call_openai_json(system_content: str, history: list[dict]) -> dict:
     messages = [{"role": "system", "content": system_content}] + history
 
     response = _openai_client.chat.completions.create(
         model="gpt-5-nano",
         messages=messages,
+        # Asegúrate de que este modelo sea el correcto, gpt-4o u otros soportados
         response_format={"type": "json_object"},
     )
     raw = response.choices[0].message.content
     return json.loads(raw)
-
 
 def _post_process_classification(
     ai_result: dict,
@@ -68,19 +61,15 @@ def _post_process_classification(
 
     if parsed_result.category not in valid_categories:
         parsed_result.category = "unknown"
-        parsed_result.subcategory = "unknown"
+        parsed_result.subcategory = ["unknown"]
         return parsed_result
 
     allowed_subcategories = subcategory_mapping.get(parsed_result.category, [])
 
-    if not all(subcategory in allowed_subcategories for subcategory in parsed_result.subcategory):
-        parsed_result.subcategory = "unknown"
+    if not parsed_result.subcategory or not all(sub in allowed_subcategories for sub in parsed_result.subcategory):
+        parsed_result.subcategory = ["unknown"]
 
     return parsed_result
-
-
-# ==================== MAIN SERVICE ====================
-
 
 def run_classification(task_id: str, user_text: str) -> None:
     try:
@@ -96,6 +85,7 @@ def run_classification(task_id: str, user_text: str) -> None:
         if task_data.get("status") == Status.NOT_FOUND:
             _store.set_failed(task_id, "task_id not found in store")
             return
+
         history = task_data.get("history", [])
         attempts = task_data.get("attempts", 0)
 
@@ -113,9 +103,9 @@ def run_classification(task_id: str, user_text: str) -> None:
             subcategory_mapping=subcategory_mapping
         )
 
-        # Context logic
         is_cat_unknown = final_result.category == "unknown"
-        is_sub_unknown = final_result.subcategory == "unknown"
+        is_sub_unknown = not final_result.subcategory or "unknown" in final_result.subcategory
+
         if is_cat_unknown or is_sub_unknown:
             attempts += 1
             if attempts >= 3:
@@ -132,8 +122,8 @@ def run_classification(task_id: str, user_text: str) -> None:
             return
 
         output_payload = final_result.model_dump(by_alias=True)
-
         subs = final_result.subcategory
+        
         if len(subs) > 1:
             subs_text = ", ".join(subs[:-1]) + f" y {subs[-1]}"
         else:
@@ -144,6 +134,7 @@ def run_classification(task_id: str, user_text: str) -> None:
             f"con un enfoque en {subs_text}. "
             "Esta es la lista de proveedores recomendada:"
         )
+        
         history.append({"role": "assistant", "content": success_msg})
 
         _store.set_completed(task_id, output_payload)

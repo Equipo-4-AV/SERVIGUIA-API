@@ -5,6 +5,6 @@ class Service_Provider(BaseModel):
     name: str
     category: str
     rating: float
-    badges: list[str]
+    subcategories: list[str]
     price_evaluation: str
     available: str

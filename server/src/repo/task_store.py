@@ -35,7 +35,6 @@ class InMemoryTaskStore:
     def set_requires_clarification(self, task_id: str, message: str, history: list, attempts: int) -> None:
         if task_id in self._data:
             self._data[task_id]["status"] = Status.REQUIRES_CLARIFICATION
-            self._data[task_id]["message"] = message
             self._data[task_id]["history"] = history
             self._data[task_id]["attempts"] = attempts
 
