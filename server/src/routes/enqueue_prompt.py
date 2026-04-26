@@ -1,6 +1,6 @@
-from typing import Annotated
+from typing import Annotated, Optional
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Form, UploadFile, File
 
 from src.middlewares.rate_limiter import limiter
 
@@ -16,11 +16,13 @@ router = APIRouter()
 @limiter.limit("5/minute")
 async def enqueue_prompt_classification(
     request: Request,
-    data: PromptRequest,
+    task_id: str,
     background_tasks: BackgroundTasks,
     store: Annotated[InMemoryTaskStore, Depends(get_task_store)],
-    task_id: str
+    context: Annotated[str, Form(description="Texto del usuario a clasificar")],
+    image: Annotated[Optional[UploadFile], File(description="Imagen a procesar")] = None
 ) -> dict[str, str | bool]:
+
     if not store.has(task_id):
         store.set_failed(task_id, "task_id not found in store")
         raise HTTPException(status_code=404, detail="task_id not found in store")
@@ -37,7 +39,12 @@ async def enqueue_prompt_classification(
     elif current_status not in [Status.REQUIRES_CLARIFICATION, Status.STARTING]:
         return {"task_id": task_id, "enqueued": True, "detail": "service is processing"}
 
+
     store.set_processing(task_id)
 
-    background_tasks.add_task(run_classification, task_id, data.context)
+    image_bytes = None
+    if image is not None:
+        image_bytes = await image.read()
+
+    background_tasks.add_task(run_classification, task_id, context, image_bytes)
     return {"task_id": task_id, "enqueued": True, "detail": "service is processing"}
