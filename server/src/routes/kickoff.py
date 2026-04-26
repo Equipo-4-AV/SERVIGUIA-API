@@ -4,7 +4,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Request
 
 from src.repo.task_store import InMemoryTaskStore, get_task_store
-from src.utils.rate_limiter import limiter
+from src.middlewares.rate_limiter import limiter
 
 router = APIRouter()
 

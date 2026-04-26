@@ -7,9 +7,9 @@ get_top_by_category function using the real trabajadores.json data.
 import math
 import pytest
 
-from src.services.recommendation import (
+from src.services.recommendation_service import (
     _calculate_score,
-    get_top_by_category,
+    get_top_by_category_and_subs,
     get_categories,
 )
 from src.utils.load import load_config, load_workers
@@ -104,24 +104,24 @@ class TestCalculateScore:
 
 class TestGetTopByCategory:
     def test_returns_list(self):
-        result = get_top_by_category("plomeria")
+        result = get_top_by_category_and_subs("plomeria")
         assert isinstance(result, list)
 
     def test_default_limit_is_10(self):
-        result = get_top_by_category("plomeria")
+        result = get_top_by_category_and_subs("plomeria")
         assert len(result) <= 10
 
     def test_custom_limit_respected(self):
-        result = get_top_by_category("plomeria", limit=3)
+        result = get_top_by_category_and_subs("plomeria", limit=3)
         assert len(result) == 3
 
     def test_all_results_match_category(self):
-        for provider in get_top_by_category("electricidad"):
-            assert provider.categoria == "electricidad"
+        for provider in get_top_by_category_and_subs("electricidad"):
+            assert provider.category == "electricidad"
 
     def test_unavailable_workers_excluded(self):
         # Every category has exactly 1 worker with disponible=False in test data
-        result = get_top_by_category("plomeria", limit=10)
+        result = get_top_by_category_and_subs("plomeria", limit=10)
         ids = [p.id for p in result]
         # Confirm unavailable plomeros are excluded (T010 is disponible=False)
         unavailable = [w["id"] for w in load_workers()
@@ -131,16 +131,16 @@ class TestGetTopByCategory:
 
     def test_sorted_best_first(self):
         # First provider should have a higher rating than the last
-        result = get_top_by_category("plomeria", limit=10)
+        result = get_top_by_category_and_subs("plomeria", limit=10)
         assert result[0].rating >= result[-1].rating
 
     def test_invalid_category_returns_empty(self):
-        result = get_top_by_category("magia")
+        result = get_top_by_category_and_subs("magia")
         assert result == []
 
     def test_case_insensitive_category(self):
-        lower  = get_top_by_category("plomeria")
-        upper  = get_top_by_category("PLOMERIA")
+        lower  = get_top_by_category_and_subs("plomeria")
+        upper  = get_top_by_category_and_subs("PLOMERIA")
         assert [p.id for p in lower] == [p.id for p in upper]
 
     def test_subcategory_boost_changes_order(self):
@@ -169,9 +169,9 @@ class TestGetTopByCategory:
             w("T_10", 3.6, 20, ["calentadores", "cisterna", "drenaje"]),
         ]
 
-        with patch("src.services.recommendation.load_workers", return_value=workers):
-            generic  = get_top_by_category("plomeria", limit=10)
-            specific = get_top_by_category("plomeria", subcategories=["calentadores"], limit=10)
+        with patch("src.services.recommendation_service.load_workers", return_value=workers):
+            generic  = get_top_by_category_and_subs("plomeria", limit=10)
+            specific = get_top_by_category_and_subs("plomeria", subcategories=["calentadores"], limit=10)
 
         # Without boost: T_01 wins (best base score — high rating + many reviews)
         assert generic[0].id == "T_01"
