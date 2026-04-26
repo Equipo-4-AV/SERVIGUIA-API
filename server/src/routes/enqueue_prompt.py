@@ -17,12 +17,12 @@ router = APIRouter()
 async def enqueue_prompt_classification(
     request: Request,
     task_id: str,
-    data: PromptRequest,
     background_tasks: BackgroundTasks,
     store: Annotated[InMemoryTaskStore, Depends(get_task_store)],
     context: Annotated[str, Form(description="Texto del usuario a clasificar")],
     image: Annotated[Optional[UploadFile], File(description="Imagen a procesar")] = None
 ) -> dict[str, str | bool]:
+
     if not store.has(task_id):
         store.set_failed(task_id, "task_id not found in store")
         raise HTTPException(status_code=404, detail="task_id not found in store")
@@ -38,6 +38,7 @@ async def enqueue_prompt_classification(
 
     elif current_status not in [Status.REQUIRES_CLARIFICATION, Status.STARTING]:
         return {"task_id": task_id, "enqueued": True, "detail": "service is processing"}
+
 
     store.set_processing(task_id)
 
