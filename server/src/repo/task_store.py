@@ -1,15 +1,11 @@
 from src.services.recommendation_service import get_top_by_category_and_subs
-from src.models.classification_result import ClassificationResult
-from src.models.service_provider import Service_Provider
+
+from src.models.task_status_enum import Status
 
 tasks_db: dict[str, dict] = {}
 
-#TODO:
-#- standerize status values in an enum
 #? standerize dictionary indexes?
 class InMemoryTaskStore:
-
-
     __slots__ = ("_data",)
 
     def __init__(self, data: dict[str, dict]) -> None:
@@ -17,28 +13,28 @@ class InMemoryTaskStore:
 
     def create_placeholder(self, task_id: str) -> None:
         self._data[task_id] = {
-            "status": "starting",
+            "status": Status.STARTING,
             "history": [],
             "attempts": 0
         }
 
     def set_processing(self, task_id: str) -> None:
         if task_id in self._data:
-            self._data[task_id]["status"] = "processing"
+            self._data[task_id]["status"] = Status.PROCESSING
 
     def set_completed(self, task_id: str, result: dict) -> None:
         if task_id in self._data:
-            self._data[task_id]["status"] = "completed"
+            self._data[task_id]["status"] = Status.COMPLETED
             self._data[task_id]["result"] = result
 
     def set_failed(self, task_id: str, error: str) -> None:
         if task_id in self._data:
-            self._data[task_id]["status"] = "failed"
+            self._data[task_id]["status"] = Status.FAILED
             self._data[task_id]["error"] = error
 
     def set_requires_clarification(self, task_id: str, message: str, history: list, attempts: int) -> None:
         if task_id in self._data:
-            self._data[task_id]["status"] = "requires_clarification"
+            self._data[task_id]["status"] = Status.REQUIRES_CLARIFICATION
             self._data[task_id]["message"] = message
             self._data[task_id]["history"] = history
             self._data[task_id]["attempts"] = attempts
@@ -57,7 +53,7 @@ class InMemoryTaskStore:
         return task_id in self._data
 
     def get(self, task_id: str) -> dict:
-        return self._data.get(task_id, {"status": "not_found"})
+        return self._data.get(task_id, {"status": Status.NOT_FOUND})
 
 
 _default_store = InMemoryTaskStore(tasks_db)

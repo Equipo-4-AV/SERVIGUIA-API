@@ -3,9 +3,11 @@ import os
 
 from openai import OpenAI
 
-from src.models.classification_result import ClassificationResult
 from src.repo.task_store import get_task_store
 from src.utils.load import load_config, load_prompt
+
+from src.models.task_status_enum import Status
+from src.models.classification_result import ClassificationResult
 
 # ==================== CORE ====================
 
@@ -91,7 +93,7 @@ def run_classification(task_id: str, user_text: str) -> None:
             return
 
         task_data = _store.get(task_id)
-        if task_data.get("status") == "not_found":
+        if task_data.get("status") == Status.NOT_FOUND:
             _store.set_failed(task_id, "task_id not found in store")
             return
         history = task_data.get("history", [])
