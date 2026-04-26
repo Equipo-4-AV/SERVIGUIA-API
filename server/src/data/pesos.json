@@ -1,19 +1,17 @@
 {
   "_descripcion": "Pesos para el algoritmo de recomendación. Wc + Wr + Wb + Wsub = 1.0",
-
-  "calificacion":         0.30,
-  "reviews_suavizados":   0.25,
-  "badges":               0.10,
-  "subcategoria":         0.35,
-
+  "calificacion": 0.30,
+  "reviews_suavizados": 0.25,
+  "badges": 0.10,
+  "subcategorias": 0.35,
   "lambda": 0.1,
 
   "_normalizacion": {
     "calificacion_max": 5.0,
-    "badges_max":       7,
-    "reviews_max":      100,
-    "experiencia_max":  20,
-    "trabajos_max":     400
+    "badges_max": 7,
+    "reviews_max": 100,
+    "experiencia_max": 20,
+    "trabajos_max": 400
   },
 
   "_categorias_validas": [
@@ -27,16 +25,34 @@
     "jardineria",
     "herreria"
   ],
-
+  
   "_mapeo_keywords": {
-    "plomeria":           ["fuga", "tuberia", "agua", "drenaje", "caño", "gotero", "calentador", "llave", "baño inundado", "filtracion", "cisterna", "bomba"],
-    "electricidad":       ["luz", "corto", "apagon", "cable", "contacto", "interruptor", "tablero", "foco", "instalacion electrica", "corriente", "panel solar"],
-    "pintura":            ["pintura", "pintar", "pared", "mancha", "descascarado", "impermeabilizante", "textura", "color", "esmalte", "barniz"],
-    "limpieza":           ["limpieza", "limpiar", "sucio", "mugre", "polvo", "desinfectar", "ordenar", "aseo", "alfombra", "vidrios"],
-    "carpinteria":        ["madera", "mueble", "puerta", "closet", "cajon", "bisagra", "carpintero", "tabla", "piso", "ventana", "cocina"],
-    "aire acondicionado": ["clima", "aire", "calor", "frio", "ac", "minisplit", "gas refrigerante", "ventilacion", "enfriar", "ducto"],
-    "cerrajeria":         ["chapa", "llave", "cerradura", "cerrajero", "puerta bloqueada", "duplicado", "caja fuerte", "porton"],
-    "jardineria":         ["jardin", "poda", "pasto", "plantas", "arbol", "riego", "maleza", "plaga", "fertilizante"],
-    "herreria":           ["reja", "porton", "metal", "soldadura", "hierro", "herreria", "puerta metalica", "escalera", "barandal"]
+    "plomeria": [
+      "fuga", "tuberia", "agua", "drenaje", "caño", "gotero", "calentador", "llave", "baño inundado", "filtracion", "cisterna", "bomba", "hidroneumatico", "instalacion sanitaria"
+    ],
+    "electricidad": [
+      "luz", "corto", "apagon", "cable", "contacto", "interruptor", "tablero", "foco", "instalacion electrica", "corriente", "panel solar", "cableado", "luminaria"
+    ],
+    "pintura": [
+      "pintura", "pintar", "pared", "mancha", "descascarado", "impermeabilizante", "textura", "color", "esmalte", "barniz", "interior", "exterior", "texturizado", "fachada"
+    ],
+    "limpieza": [
+      "limpieza", "limpiar", "sucio", "mugre", "polvo", "desinfectar", "ordenar", "aseo", "alfombra", "vidrios", "limpieza general", "limpieza profunda", "desinfeccion", "oficinas", "post construccion"
+    ],
+    "carpinteria": [
+      "madera", "mueble", "puerta", "closet", "cajon", "bisagra", "carpintero", "tabla", "piso", "ventana", "cocina", "cocinas integrales", "pisos de madera", "reparacion madera"
+    ],
+    "aire acondicionado": [
+      "clima", "aire", "calor", "frio", "ac", "minisplit", "gas refrigerante", "ventilacion", "enfriar", "ducto", "mantenimiento", "recarga de gas", "reparacion", "instalacion"
+    ],
+    "cerrajeria": [
+      "chapa", "llave", "cerradura", "cerrajero", "puerta bloqueada", "duplicado", "caja fuerte", "porton", "apertura de puertas", "cambio de chapas", "duplicado de llaves", "chapas de seguridad"
+    ],
+    "jardineria": [
+      "jardin", "poda", "pasto", "plantas", "arbol", "riego", "maleza", "plaga", "fertilizante", "mantenimiento", "diseño de jardines", "fertilizacion"
+    ],
+    "herreria": [
+      "reja", "porton", "metal", "soldadura", "hierro", "herreria", "puerta metalica", "escalera", "barandal", "estructuras"
+    ]
   }
 }
