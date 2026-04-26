@@ -50,7 +50,7 @@ class InMemoryTaskStore:
             classification = self._data[task_id]["result"] #classification is a dict using ClassificationResult aliases
             self._data[task_id]["providers"] = get_top_by_category_and_subs(
                 category = classification["categoria"],
-                subcategories = [classification["subcategoria"]] #TODO make system prompt do an array of subcategories
+                subcategories = classification["subcategoria"]
                     )
 
     def has(self, task_id: str) -> bool:

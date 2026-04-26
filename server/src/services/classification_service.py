@@ -58,6 +58,8 @@ def _post_process_classification(
 ) -> ClassificationResult:
 
     parsed_result = ClassificationResult.model_validate(ai_result)
+    print(ai_result)
+    print(parsed_result)
 
     if parsed_result.is_emergency is True:
         parsed_result.safety_message = (
@@ -71,7 +73,7 @@ def _post_process_classification(
 
     allowed_subcategories = subcategory_mapping.get(parsed_result.category, [])
 
-    if parsed_result.subcategory not in allowed_subcategories:
+    if not all(subcategory in  allowed_subcategories for subcategory in parsed_result.subcategory):
         parsed_result.subcategory = "unknown"
 
     return parsed_result
