@@ -10,8 +10,8 @@ export function MessageBubble({ message }: { message: ChatMessage }) {
 
   if (isUser) {
     return (
-      <div className="flex items-start justify-end gap-3">
-        <div className="max-w-[75%] space-y-2">
+      <div className="flex items-start justify-end gap-2 sm:gap-3">
+        <div className="max-w-[80%] space-y-2 sm:max-w-[75%]">
           {message.imageUrl && (
             <img
               src={message.imageUrl}
@@ -23,7 +23,7 @@ export function MessageBubble({ message }: { message: ChatMessage }) {
             {message.text}
           </div>
         </div>
-        <div className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-secondary text-secondary-foreground">
+        <div className="mt-1 hidden h-8 w-8 shrink-0 items-center justify-center rounded-full bg-secondary text-secondary-foreground sm:flex">
           <User className="h-4 w-4" />
         </div>
       </div>
@@ -33,11 +33,11 @@ export function MessageBubble({ message }: { message: ChatMessage }) {
   const d = message.diagnosis;
 
   return (
-    <div className="flex items-start gap-3">
-      <div className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[image:var(--gradient-primary)] text-primary-foreground">
+    <div className="flex items-start gap-2 sm:gap-3">
+      <div className="mt-1 hidden h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[image:var(--gradient-primary)] text-primary-foreground sm:flex">
         <Sparkles className="h-4 w-4" />
       </div>
-      <div className="w-full max-w-[85%] space-y-3">
+      <div className="w-full min-w-0 max-w-full space-y-3 sm:max-w-[85%]">
         {/* Emergency takes precedence — no diagnosis or recommendation */}
         {d?.emergency_analysis.is_emergency && (
           <EmergencyCard data={d.emergency_analysis} />
