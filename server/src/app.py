@@ -1,6 +1,7 @@
 import os
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
 
 #rate limiting
 from slowapi import _rate_limit_exceeded_handler
@@ -42,6 +43,14 @@ Receives input data of user form mobile app: {os.getenv('CLIENT_APP')}
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(InternalErrorHandler)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # region Root
 @app.get("/")

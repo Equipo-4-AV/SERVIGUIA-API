@@ -1,42 +1,29 @@
 import { useEffect, useRef, useState } from "react";
 import { Image as ImageIcon, Send, Trash2, X, AlertCircle, MessageCircle } from "lucide-react";
-import type { ChatMessage, DiagnosisResponse, IntegrationDebugPayload } from "@/types";
-import { historyFromMessages, requestDiagnosis } from "@/api";
 import { MessageBubble } from "./MessageBubble";
-import { ProcessingStatus, type ProcessingStage } from "./ProcessingStatus";
+import { ProcessingStatus } from "./ProcessingStatus";
+import { useAgentChat } from "@/hooks/useAgentChat";
 
-interface Props {
-  messages: ChatMessage[];
-  setMessages: React.Dispatch<React.SetStateAction<ChatMessage[]>>;
-  onDiagnosis: (data: DiagnosisResponse, source: "api" | "mock") => void;
-  onDebug?: (debug: IntegrationDebugPayload | null) => void;
-}
-
-export function Chat({ messages, setMessages, onDiagnosis, onDebug }: Props) {
+export function Chat() {
   const [text, setText] = useState("");
   const [image, setImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [stage, setStage] = useState<ProcessingStage | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const abortRef = useRef<AbortController | null>(null);
-  // Persist the conversation id across turns so clarification replies stay
-  // in the same task on the real backend. In mock mode this is just a
-  // stable local placeholder and has no network effect.
-  const taskIdRef = useRef<string | null>(null);
+
+  const {
+    messages,
+    providers,
+    currentResult,
+    isProcessing,
+    error,
+    sendMessage,
+    clearChat
+  } = useAgentChat();
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-  }, [messages, stage]);
-
-  // Cancel any in-flight request when the chat unmounts to prevent
-  // duplicate polling loops or state updates on stale data.
-  useEffect(() => {
-    return () => {
-      abortRef.current?.abort();
-    };
-  }, []);
+  }, [messages, isProcessing, providers]);
 
   const handleFile = (f: File | null) => {
     setImage(f);
@@ -49,102 +36,15 @@ export function Chat({ messages, setMessages, onDiagnosis, onDebug }: Props) {
     }
   };
 
-  const send = async (overrideText?: string) => {
-    const messageText = (overrideText ?? text).trim();
-    if (!messageText || stage) return;
+  const send = () => {
+    const messageText = text.trim();
+    if (!messageText || isProcessing) return;
 
-    setError(null);
-    const userMsg: ChatMessage = {
-      id: crypto.randomUUID(),
-      role: "user",
-      text: messageText,
-      imageUrl: imagePreview ?? undefined,
-      timestamp: Date.now(),
-    };
-
-    const newMessages = [...messages, userMsg];
-    setMessages(newMessages);
+    sendMessage(messageText, image);
     setText("");
-    const sentImage = image;
-    handleFile(null);
+    setImage(null);
+    setImagePreview(null);
     if (fileRef.current) fileRef.current.value = "";
-
-    // Animated pipeline stages
-    setStage("emergency");
-    const stagesTimeline: ProcessingStage[] = ["classification", "matching"];
-    const stageTimers: ReturnType<typeof setTimeout>[] = [];
-    stagesTimeline.forEach((s, i) => {
-      stageTimers.push(setTimeout(() => setStage(s), 600 * (i + 1)));
-    });
-
-    // Replace any previous in-flight request so we never run two polling
-    // loops at once (e.g. user sends a second message quickly).
-    abortRef.current?.abort();
-    const controller = new AbortController();
-    abortRef.current = controller;
-
-    try {
-      onDebug?.(null);
-      const { data, source, taskId } = await requestDiagnosis(
-        {
-          text: messageText,
-          image: sentImage,
-          history: historyFromMessages(newMessages),
-        },
-        { taskId: taskIdRef.current ?? undefined, signal: controller.signal },
-      );
-
-      // Remember the task id for follow-up turns (clarification flow).
-      // Once the conversation reaches a final result (emergency or ready
-      // recommendation) we close the task so the next user message starts
-      // a fresh one. We keep it open while clarification is needed.
-      if (data.status === "needs_input") {
-        taskIdRef.current = taskId;
-      } else {
-        taskIdRef.current = null;
-      }
-
-      // If pipeline indicates follow-up, reflect it briefly
-      if (data.status === "needs_input") setStage("follow_up");
-      else if (data.emergency_analysis.is_emergency) setStage("emergency");
-      else setStage("done");
-
-      const assistantMsg: ChatMessage = {
-        id: crypto.randomUUID(),
-        role: "assistant",
-        text: data.diagnosis?.resumen ?? data.emergency_analysis.motivo ?? "Resultado listo",
-        diagnosis: data,
-        timestamp: Date.now(),
-      };
-      // small pause so user perceives the final stage label
-      await new Promise((r) => setTimeout(r, 250));
-      setMessages((prev) => [...prev, assistantMsg]);
-      onDiagnosis(data, source);
-    } catch (e) {
-      if (e instanceof DOMException && e.name === "AbortError") {
-        // Cancelled by a newer request — silently drop.
-        return;
-      }
-      if (e instanceof Error && "payload" in e) {
-        onDebug?.(e.payload as IntegrationDebugPayload);
-      }
-      // Friendly, non-technical message — never expose raw status codes.
-      setError(
-        "No pudimos completar tu solicitud. Por favor intenta de nuevo en un momento.",
-      );
-      // Reset the conversation so the next attempt starts fresh.
-      taskIdRef.current = null;
-    } finally {
-      stageTimers.forEach(clearTimeout);
-      setStage(null);
-    }
-  };
-
-  const clear = () => {
-    setMessages([]);
-    setError(null);
-    taskIdRef.current = null;
-    abortRef.current?.abort();
   };
 
   return (
@@ -169,7 +69,20 @@ export function Chat({ messages, setMessages, onDiagnosis, onDebug }: Props) {
           messages.map((m) => <MessageBubble key={m.id} message={m} />)
         )}
 
-        {stage && <ProcessingStatus stage={stage} />}
+        {/* Proveedores */}
+        {providers.length > 0 && (
+          <div className="flex flex-col gap-2 p-2">
+            <h3 className="font-semibold text-sm">Proveedores recomendados:</h3>
+            {providers.map((p) => (
+              <div key={p.id} className="border p-3 rounded-lg shadow-sm bg-card">
+                <h4 className="font-bold">{p.name}</h4>
+                <p className="text-sm text-muted-foreground">{p.category} - {p.price_evaluation}</p>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {isProcessing && <ProcessingStatus stage="classification" />}
 
         {error && (
           <div className="flex items-start gap-2 rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
@@ -183,7 +96,7 @@ export function Chat({ messages, setMessages, onDiagnosis, onDebug }: Props) {
         {messages.length > 0 && (
           <div className="mb-2 flex justify-end">
             <button
-              onClick={clear}
+              onClick={clearChat}
               className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
             >
               <Trash2 className="h-3.5 w-3.5" />
@@ -216,7 +129,7 @@ export function Chat({ messages, setMessages, onDiagnosis, onDebug }: Props) {
           />
           <button
             onClick={() => fileRef.current?.click()}
-            disabled={!!stage}
+            disabled={isProcessing}
             className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground disabled:opacity-40"
             aria-label="Adjuntar imagen"
           >
@@ -234,11 +147,11 @@ export function Chat({ messages, setMessages, onDiagnosis, onDebug }: Props) {
             rows={1}
             placeholder="Escribe tu mensaje…"
             className="hide-scrollbar min-h-[48px] max-h-32 flex-1 resize-none bg-transparent px-1 py-3 text-base text-foreground outline-none placeholder:text-muted-foreground"
-            disabled={!!stage}
+            disabled={isProcessing}
           />
           <button
             onClick={() => send()}
-            disabled={!!stage || !text.trim()}
+            disabled={isProcessing || !text.trim()}
             className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[image:var(--gradient-primary)] text-primary-foreground shadow-[var(--shadow-elegant)] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
             aria-label="Enviar"
           >
