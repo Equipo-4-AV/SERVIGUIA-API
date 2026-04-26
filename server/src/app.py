@@ -11,7 +11,6 @@ from src.routes.status import router as status_router #!not fully implemented bu
 from src.routes.enqueue_prompt import router as enqueue_prompt_router
 from src.routes.kickoff import router as kickoff_router
 from src.routes.output import router as output_router
-from src.utils.load import load_config, load_prompt
 
 #middleware
 from src.middlewares.internal_error_handler import InternalErrorHandler

@@ -3,6 +3,7 @@ import os
 import base64
 
 from openai import OpenAI
+from pydantic import BaseModel, ConfigDict, Field
 
 from src.repo.task_store import get_task_store
 from src.utils.load import load_config, load_prompt
@@ -47,15 +48,20 @@ def _normalize_subcategory_mapping(config: dict) -> dict[str, list[str]]:
 
     return mapping
 
-
-def _build_classifier_system_content(system_prompt: str, config: dict, subcategory_mapping: dict) -> str:
+def _build_classifier_system_content(system_prompt: str, subcategories_mapping: dict) -> str:
     return (
         f"{system_prompt}\n"
-        f"SUBCATEGORÍAS VÁLIDAS POR CATEGORÍA (Tareas/Problemas):\n"
-        f"{json.dumps(subcategory_mapping, ensure_ascii=False)}\n\n"
-        "REGLA ESTRICTA: Debes seleccionar exactamente una subcategoría de las listas anteriores. No inventes subcategorías."
+        f"SUBCATEGORÍAS VÁLIDAS POR CATEGORÍA:\n"
+        f"{json.dumps(subcategories_mapping, ensure_ascii=False)}\n\n"
+        "REGLA DE FORMATO JSON:\n"
+        "Responde exclusivamente con un objeto JSON:\n"
+        "{\n"
+        '  "categoria": "string",\n'
+        '  "subcategorias": ["string"],\n'
+        '  "es_emergencia": boolean\n'
+        "}\n"
+        "REGLA ESTRICTA: Usa solo subcategorías de la lista. No inventes términos."
     )
-
 
 def _call_openai_json(system_content: str, history: list[dict]) -> dict:
     messages = [{"role": "system", "content": system_content}] + history
@@ -68,29 +74,30 @@ def _call_openai_json(system_content: str, history: list[dict]) -> dict:
     raw = response.choices[0].message.content
     return json.loads(raw)
 
-
 def _post_process_classification(
     ai_result: dict,
     valid_categories: list[str],
-    subcategory_mapping: dict,
+    subcategories_mapping: dict,
 ) -> ClassificationResult:
+    try:
+        parsed_result = ClassificationResult.model_validate(ai_result)
+    except Exception:
+        return ClassificationResult(category="unknown", subcategories=["unknown"])
 
-    parsed_result = ClassificationResult.model_validate(ai_result)
-
-    if parsed_result.is_emergency is True:
+    if parsed_result.is_emergency:
         parsed_result.safety_message = (
-            "EMERGENCIA DETECTADA: Por favor, llame al 911 de inmediato y evacúe el area si es necesario."
+            "EMERGENCIA DETECTADA: Por favor, llame al 911 de inmediato."
         )
 
     if parsed_result.category not in valid_categories:
         parsed_result.category = "unknown"
-        parsed_result.subcategory = "unknown"
+        parsed_result.subcategories = ["unknown"]
         return parsed_result
 
-    allowed_subcategories = subcategory_mapping.get(parsed_result.category, [])
+    allowed = subcategories_mapping.get(parsed_result.category, [])
+    clean_subs = [sub for sub in parsed_result.subcategories if sub in allowed]
 
-    if not all(subcategory in allowed_subcategories for subcategory in parsed_result.subcategory):
-        parsed_result.subcategory = "unknown"
+    parsed_result.subcategories = clean_subs if clean_subs else ["unknown"]
 
     return parsed_result
 
@@ -98,7 +105,7 @@ def _post_process_classification(
 def _get_clarification_needed(result: ClassificationResult) -> tuple[bool, str]:
     """Determina si el resultado requiere clarificación y genera el mensaje."""
     is_cat_unknown = result.category == "unknown"
-    is_sub_unknown = result.subcategory == "unknown"
+    is_sub_unknown = result.subcategories == ["unknown"]
 
     if not is_cat_unknown and not is_sub_unknown:
         return False, ""
@@ -111,7 +118,7 @@ def _get_clarification_needed(result: ClassificationResult) -> tuple[bool, str]:
 
 def _format_success_response(result: ClassificationResult) -> str:
     """Genera el mensaje de éxito amigable para el usuario."""
-    subs = result.subcategory
+    subs = result.subcategories
     subs_text = ", ".join(subs[:-1]) + f" y {subs[-1]}" if len(subs) > 1 else subs[0]
 
     return (
@@ -136,7 +143,7 @@ def run_classification(task_id: str, user_text: str, image_bytes: bytes | None =
 
         task_data = _store.get(task_id)
         if task_data.get("status") == Status.NOT_FOUND:
-            _store.set_failed(task_id, "task_id not found in store")
+            _store.set_failed(task_id, "task_id no encontrado")
             return
 
 
@@ -150,7 +157,7 @@ def run_classification(task_id: str, user_text: str, image_bytes: bytes | None =
 
         # Classification
         system_content = _build_classifier_system_content(
-            SYSTEM_PROMPT, CONFIG, _normalize_subcategory_mapping(CONFIG)
+            SYSTEM_PROMPT, _normalize_subcategory_mapping(CONFIG)
         )
         raw_ai_result = _call_openai_json(system_content, history)
 
