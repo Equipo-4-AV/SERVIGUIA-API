@@ -85,7 +85,7 @@ class TestCalculateScore:
             config["calificacion"]         * c_norm
             + config["reviews_suavizados"] * r_score
             + config["badges"]             * b_norm
-            + config["subcategoria"]       * 1.0
+            + config["subcategorias"]       * 1.0
         )
         assert abs(score_no_subs - expected) < 1e-9
 

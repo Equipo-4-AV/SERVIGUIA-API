@@ -53,14 +53,7 @@ def _build_classifier_system_content(system_prompt: str, subcategories_mapping: 
         f"{system_prompt}\n"
         f"SUBCATEGORÍAS VÁLIDAS POR CATEGORÍA:\n"
         f"{json.dumps(subcategories_mapping, ensure_ascii=False)}\n\n"
-        "REGLA DE FORMATO JSON:\n"
-        "Responde exclusivamente con un objeto JSON:\n"
-        "{\n"
-        '  "categoria": "string",\n'
-        '  "subcategorias": ["string"],\n'
-        '  "es_emergencia": boolean\n'
-        "}\n"
-        "REGLA ESTRICTA: Usa solo subcategorías de la lista. No inventes términos."
+        "REGLA ESTRICTA: Debes seleccionar al menos una o varias subcategoría de las listas anteriores. No inventes subcategorías."
     )
 
 def _call_openai_json(system_content: str, history: list[dict]) -> dict:
@@ -86,7 +79,7 @@ def _post_process_classification(
 
     if parsed_result.is_emergency:
         parsed_result.safety_message = (
-            "EMERGENCIA DETECTADA: Por favor, llame al 911 de inmediato."
+            "EMERGENCIA DETECTADA: Por favor, llame al 911 de inmediato y evacúe el area si es necesario."
         )
 
     if parsed_result.category not in valid_categories:
@@ -143,7 +136,7 @@ def run_classification(task_id: str, user_text: str, image_bytes: bytes | None =
 
         task_data = _store.get(task_id)
         if task_data.get("status") == Status.NOT_FOUND:
-            _store.set_failed(task_id, "task_id no encontrado")
+            _store.set_failed(task_id, "task_id not found in store")
             return
 
 

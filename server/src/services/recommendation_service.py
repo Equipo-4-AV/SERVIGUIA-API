@@ -42,7 +42,7 @@ def _calculate_score(
         weights["calificacion"]       * c_norm
         + weights["reviews_suavizados"] * r_score
         + weights["badges"]           * b_norm
-        + weights["subcategoria"]     * sub_norm
+        + weights["subcategorias"]     * sub_norm
     )
 
 

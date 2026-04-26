@@ -3,7 +3,7 @@
   "calificacion": 0.30,
   "reviews_suavizados": 0.25,
   "badges": 0.10,
-  "subcategoria": 0.35,
+  "subcategorias": 0.35,
   "lambda": 0.1,
 
   "_normalizacion": {
