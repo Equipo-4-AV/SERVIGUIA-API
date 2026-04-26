@@ -71,7 +71,7 @@ def _post_process_classification(
 
     allowed_subcategories = subcategory_mapping.get(parsed_result.category, [])
 
-    if parsed_result.subcategory not in allowed_subcategories:
+    if not all(subcategory in allowed_subcategories for subcategory in parsed_result.subcategory):
         parsed_result.subcategory = "unknown"
 
     return parsed_result
@@ -112,29 +112,39 @@ def run_classification(task_id: str, user_text: str) -> None:
         )
 
         # Context logic
-        if final_result.category == "unknown" or final_result.subcategory == "unknown":
+        is_cat_unknown = final_result.category == "unknown"
+        is_sub_unknown = final_result.subcategory == "unknown"
+        if is_cat_unknown or is_sub_unknown:
             attempts += 1
-
             if attempts >= 3:
-                _store.set_failed(
-                    task_id,
-                    "Cancelado: No pudimos clasificar tu problema después de 3 intentos. Por favor, reinicia el proceso."
-                )
+                _store.set_failed(task_id, "Cancelado: No pudimos clasificar tu problema tras 3 intentos.")
                 return
 
-            clarification_msg = "No me quedó muy claro tu problema. ¿Podrías ser un poco más específico sobre el servicio o la falla que presentas?"
-            history.append({"role": "assistant", "content": clarification_msg})
-            _store.set_requires_clarification(
-                task_id=task_id,
-                message=clarification_msg,
-                history=history,
-                attempts=attempts
-            )
+            if is_cat_unknown:
+                msg = "No me quedó muy claro tu problema. ¿Podrías ser un poco más específico sobre el servicio o la falla?"
+            else:
+                msg = f"No me quedó muy claro tu problema de {final_result.category.capitalize()}. ¿Podrías ser un poco más específico sobre el servicio?"
+
+            history.append({"role": "assistant", "content": msg})
+            _store.set_requires_clarification(task_id, msg, history, attempts)
             return
 
         output_payload = final_result.model_dump(by_alias=True)
-        _store.set_completed(task_id, output_payload)
 
+        subs = final_result.subcategory
+        if len(subs) > 1:
+            subs_text = ", ".join(subs[:-1]) + f" y {subs[-1]}"
+        else:
+            subs_text = subs[0]
+
+        success_msg = (
+            f"Perfecto. Detectamos que buscas el servicio de {final_result.category.capitalize()} "
+            f"con un enfoque en {subs_text}. "
+            "Esta es la lista de proveedores recomendada:"
+        )
+        history.append({"role": "assistant", "content": success_msg})
+
+        _store.set_completed(task_id, output_payload)
         _store.set_providers(task_id)
 
     except Exception as e:
