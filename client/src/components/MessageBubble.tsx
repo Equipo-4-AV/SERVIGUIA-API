@@ -1,7 +1,7 @@
 import type { ChatMessage } from "@/types";
 import { Sparkles, User } from "lucide-react";
 
-export function MessageBubble({ message }: { message: ChatMessage }) {
+export function MessageBubble({ message, onImageClick }: { message: ChatMessage; onImageClick?: (url: string) => void }) {
   const isUser = message.role === "user";
 
   if (isUser) {
@@ -12,7 +12,8 @@ export function MessageBubble({ message }: { message: ChatMessage }) {
             <img
               src={message.imageUrl}
               alt="Adjunto del usuario"
-              className="ml-auto max-h-48 rounded-xl border border-border object-cover"
+              onClick={() => onImageClick?.(message.imageUrl!)}
+              className="ml-auto max-h-48 rounded-xl border border-border object-cover cursor-pointer transition-opacity hover:opacity-90"
             />
           )}
           <div className="rounded-2xl rounded-tr-sm bg-[image:var(--gradient-primary)] px-4 py-2.5 text-sm text-primary-foreground shadow-[var(--shadow-elegant)]">

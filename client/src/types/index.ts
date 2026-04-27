@@ -12,7 +12,7 @@ export type Status =
 
 export interface ClassificationResult {
   categoria: string | null;
-  subcategoria: string[] | null;
+  subcategorias: string[] | null;
   es_emergencia: boolean;
   safety_message: string | null;
 }
