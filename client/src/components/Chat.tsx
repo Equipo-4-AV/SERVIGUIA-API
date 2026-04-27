@@ -1,8 +1,10 @@
-import { useEffect, useRef, useState } from "react";
-import { Image as ImageIcon, Send, Trash2, X, AlertCircle, MessageCircle } from "lucide-react";
+import { useEffect, useRef, useState, useContext } from "react";
+import { Image as ImageIcon, Send, Trash2, X, AlertCircle, MessageCircle, MessageSquare } from "lucide-react";
 import { MessageBubble } from "./MessageBubble";
 import { ProcessingStatus } from "./ProcessingStatus";
 import { useAgentChat } from "@/hooks/useAgentChat";
+import type { BackendProvider } from "@/types";
+import { CreditsContext } from "@/contexts/CreditsContext";
 
 const mapPrice = (priceStr: string) => {
   const mapping: Record<string, string> = {
@@ -34,8 +36,14 @@ export function Chat() {
   const [image, setImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [displayProviders, setDisplayProviders] = useState<BackendProvider[]>([]);
+  const [visibleCount, setVisibleCount] = useState(4);
+  const [selectedProviderForChat, setSelectedProviderForChat] = useState<BackendProvider | null>(null);
+  const [modalError, setModalError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  
+  const creditsCtx = useContext(CreditsContext);
 
   const {
     messages,
@@ -49,7 +57,47 @@ export function Chat() {
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-  }, [messages, isProcessing, providers]);
+  }, [messages, isProcessing, displayProviders, visibleCount]);
+
+  useEffect(() => {
+    if (providers.length === 0) {
+      setDisplayProviders([]);
+      setVisibleCount(4);
+      return;
+    }
+
+    const reordered = [...providers];
+    if (reordered.length > 1) {
+      const top1 = reordered[0];
+      const rest = reordered.slice(1);
+      
+      for (let i = rest.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [rest[i], rest[j]] = [rest[j], rest[i]];
+      }
+      
+      if (rest.length > 0) {
+        setDisplayProviders([rest[0], top1, ...rest.slice(1)]);
+      } else {
+        setDisplayProviders([top1]);
+      }
+    } else {
+      setDisplayProviders(reordered);
+    }
+  }, [providers]);
+
+  const handleConfirmChat = () => {
+    if (!selectedProviderForChat || !creditsCtx) return;
+    
+    const result = creditsCtx.contactProvider(selectedProviderForChat.name);
+    if (!result.ok) {
+      setModalError(result.reason || "Error desconocido");
+      return;
+    }
+    
+    setSelectedProviderForChat(null);
+    setModalError(null);
+  };
 
   const handleFile = (f: File | null) => {
     setImage(f);
@@ -99,6 +147,44 @@ export function Chat() {
         </div>
       )}
 
+      {/* Modal de confirmación de contacto */}
+      {selectedProviderForChat && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-card w-full max-w-sm rounded-2xl p-6 shadow-xl border border-border">
+            <h3 className="text-xl font-bold mb-3 text-foreground">Confirmar contacto</h3>
+            <p className="text-sm text-muted-foreground mb-6">
+              Vas a iniciar un chat con <span className="font-semibold text-foreground">{selectedProviderForChat.name}</span>. Se descontarán {creditsCtx?.contactCost || 5} créditos de tu saldo.
+            </p>
+            
+            {modalError && (
+              <div className="mb-4 flex items-start gap-2 rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>{modalError}</span>
+              </div>
+            )}
+            
+            <div className="flex justify-end gap-3">
+              <button 
+                onClick={() => {
+                  setSelectedProviderForChat(null);
+                  setModalError(null);
+                }}
+                className="px-4 py-2 rounded-xl text-sm font-medium text-muted-foreground hover:bg-secondary transition-colors"
+              >
+                Cancelar
+              </button>
+              <button 
+                onClick={handleConfirmChat}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium bg-[image:var(--gradient-primary)] text-primary-foreground shadow-[var(--shadow-elegant)] hover:opacity-90 transition-opacity"
+              >
+                <MessageSquare className="h-4 w-4" />
+                Iniciar chat
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex h-[calc(100dvh-64px)] flex-col">
         <div
           ref={scrollRef}
@@ -137,7 +223,7 @@ export function Chat() {
                 <div className="h-px flex-1 bg-border" />
               </div>
               
-              {providers.map((p) => {
+              {displayProviders.slice(0, visibleCount).map((p) => {
                 // Calcular intersección para mostrar solo subcategorías relevantes (chips)
                 const problemSubs = currentResult?.subcategorias?.map(s => s.toLowerCase().trim()) || [];
                 const matchingSubs = p.subcategories.filter(sub => 
@@ -145,33 +231,61 @@ export function Chat() {
                 );
 
                 return (
-                  <div key={p.id} className="border border-border p-4 rounded-2xl shadow-sm bg-card transition-shadow hover:shadow-md flex flex-col gap-3">
-                    <div className="flex justify-between items-start gap-4">
-                      <div className="min-w-0">
+                  <div key={p.id} className="border border-border p-4 rounded-2xl shadow-sm bg-card transition-shadow hover:shadow-md flex gap-4 min-h-[116px]">
+                    {/* Columna Izquierda */}
+                    <div className="flex-1 min-w-0 flex flex-col justify-between">
+                      <div>
                         <h4 className="font-bold text-base sm:text-lg text-foreground truncate">{p.name}</h4>
                         <p className="text-sm text-muted-foreground capitalize">{p.category}</p>
                       </div>
-                      <div className="text-right shrink-0">
-                        <div className="text-sm font-medium text-foreground mb-1">{mapPrice(p.price_evaluation)}</div>
-                        <div className="flex justify-end">{renderStars(p.rating)}</div>
-                      </div>
-                    </div>
-                    
-                    {matchingSubs.length > 0 && (
-                      <div className="flex flex-wrap gap-1.5 mt-1">
+                      
+                      {/* Subcategorías (Espacio reservado para consistencia visual) */}
+                      <div className="flex flex-wrap gap-1.5 mt-3 min-h-[24px] content-end overflow-hidden">
                         {matchingSubs.map(sub => (
                           <span 
                             key={sub} 
-                            className="px-2.5 py-1 bg-secondary text-secondary-foreground text-[11px] sm:text-xs font-medium rounded-md border border-border/50 capitalize"
+                            className="px-2 py-0.5 bg-secondary text-secondary-foreground text-[11px] font-medium rounded-md border border-border/50 capitalize whitespace-nowrap"
                           >
                             {sub}
                           </span>
                         ))}
                       </div>
-                    )}
+                    </div>
+
+                    {/* Columna Derecha */}
+                    <div className="flex flex-col justify-between items-end shrink-0">
+                      <div className="text-right">
+                        <div className="text-sm font-medium text-foreground mb-1">{mapPrice(p.price_evaluation)}</div>
+                        <div className="flex justify-end">{renderStars(p.rating)}</div>
+                      </div>
+                      
+                      <div className="mt-2">
+                        <button
+                          onClick={() => {
+                            setModalError(null);
+                            setSelectedProviderForChat(p);
+                          }}
+                          className="inline-flex items-center gap-1.5 rounded-xl bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-primary/20"
+                        >
+                          <MessageSquare className="h-3.5 w-3.5" />
+                          Iniciar chat
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 );
               })}
+              
+              {visibleCount < displayProviders.length && (
+                <div className="flex justify-center mt-2">
+                  <button
+                    onClick={() => setVisibleCount(displayProviders.length)}
+                    className="rounded-full bg-secondary px-5 py-2 text-sm font-medium text-secondary-foreground transition-colors hover:bg-secondary/80 border border-border"
+                  >
+                    Ver más
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
