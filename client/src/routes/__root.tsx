@@ -29,14 +29,14 @@ export const Route = createRootRoute({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "ServiGuía · Diagnóstico inteligente para servicios del hogar" },
+      { title: "ServiApp · Diagnóstico inteligente para servicios del hogar" },
       {
         name: "description",
         content:
-          "ServiGuía es un asistente de diagnóstico para servicios del hogar: detecta emergencias, clasifica el problema y sugiere proveedores.",
+          "ServiApp es un asistente de diagnóstico para servicios del hogar: detecta emergencias, clasifica el problema y sugiere proveedores.",
       },
-      { name: "author", content: "ServiGuía" },
-      { property: "og:title", content: "ServiGuía · Diagnóstico inteligente del hogar" },
+      { name: "author", content: "ServiApp" },
+      { property: "og:title", content: "ServiApp · Diagnóstico inteligente para servicios del hogar" },
       {
         property: "og:description",
         content: "Describe tu problema y recibe diagnóstico, urgencia y proveedores sugeridos.",
@@ -44,6 +44,12 @@ export const Route = createRootRoute({
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:site", content: "@Lovable" },
+      { name: "twitter:title", content: "ServiApp · Diagnóstico inteligente para servicios del hogar" },
+      { name: "description", content: "ServiApp: Diagnóstico inteligente y asistencia para servicios del hogar." },
+      { property: "og:description", content: "ServiApp: Diagnóstico inteligente y asistencia para servicios del hogar." },
+      { name: "twitter:description", content: "ServiApp: Diagnóstico inteligente y asistencia para servicios del hogar." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/5a9ccf06-f70d-4f83-abde-8ebdb26c4266/id-preview-42ea3f76--bba110e9-8cfd-429d-b03f-1ad3dcc68476.lovable.app-1777177562411.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/5a9ccf06-f70d-4f83-abde-8ebdb26c4266/id-preview-42ea3f76--bba110e9-8cfd-429d-b03f-1ad3dcc68476.lovable.app-1777177562411.png" },
     ],
     links: [
       {

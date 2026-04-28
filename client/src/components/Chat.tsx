@@ -1,30 +1,103 @@
-import { useEffect, useRef, useState } from "react";
-import { Image as ImageIcon, Send, Trash2, X, AlertCircle } from "lucide-react";
-import type { ChatMessage, DiagnosisResponse } from "@/types";
-import { historyFromMessages, requestDiagnosis } from "@/services/api";
+import { useEffect, useRef, useState, useContext } from "react";
+import { Image as ImageIcon, Send, Trash2, X, AlertCircle, MessageCircle, MessageSquare } from "lucide-react";
 import { MessageBubble } from "./MessageBubble";
-import { ExamplePrompts } from "./ExamplePrompts";
-import { InputGuide } from "./InputGuide";
-import { ProcessingStatus, type ProcessingStage } from "./ProcessingStatus";
+import { ProcessingStatus } from "./ProcessingStatus";
+import { useAgentChat } from "@/hooks/useAgentChat";
+import type { BackendProvider } from "@/types";
+import { CreditsContext } from "@/contexts/CreditsContext";
 
-interface Props {
-  messages: ChatMessage[];
-  setMessages: React.Dispatch<React.SetStateAction<ChatMessage[]>>;
-  onDiagnosis: (data: DiagnosisResponse, source: "api" | "mock") => void;
-}
+const mapPrice = (priceStr: string) => {
+  const mapping: Record<string, string> = {
+    "$": "Económico · $",
+    "$$": "Precio medio · $$",
+    "$$$": "Costoso · $$$",
+    "$$$$": "Premium · $$$$"
+  };
+  return mapping[priceStr] || priceStr;
+};
 
-export function Chat({ messages, setMessages, onDiagnosis }: Props) {
+const renderStars = (rating: number) => {
+  const fullStars = Math.floor(rating);
+  const hasHalf = rating % 1 !== 0;
+  const emptyStars = 5 - Math.ceil(rating);
+  
+  return (
+    <span className="text-yellow-400 font-medium">
+      {"★".repeat(fullStars)}
+      {hasHalf ? "½" : ""}
+      {"☆".repeat(Math.max(0, emptyStars))}
+      <span className="ml-1.5 text-sm text-muted-foreground">{rating.toFixed(1)}</span>
+    </span>
+  );
+};
+
+export function Chat() {
   const [text, setText] = useState("");
   const [image, setImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [stage, setStage] = useState<ProcessingStage | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [displayProviders, setDisplayProviders] = useState<BackendProvider[]>([]);
+  const [visibleCount, setVisibleCount] = useState(4);
+  const [selectedProviderForChat, setSelectedProviderForChat] = useState<BackendProvider | null>(null);
+  const [modalError, setModalError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  
+  const creditsCtx = useContext(CreditsContext);
+
+  const {
+    messages,
+    providers,
+    currentResult,
+    isProcessing,
+    error,
+    sendMessage,
+    clearChat
+  } = useAgentChat();
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-  }, [messages, stage]);
+  }, [messages, isProcessing, displayProviders, visibleCount]);
+
+  useEffect(() => {
+    if (providers.length === 0) {
+      setDisplayProviders([]);
+      setVisibleCount(4);
+      return;
+    }
+
+    const reordered = [...providers];
+    if (reordered.length > 1) {
+      const top1 = reordered[0];
+      const rest = reordered.slice(1);
+      
+      for (let i = rest.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [rest[i], rest[j]] = [rest[j], rest[i]];
+      }
+      
+      if (rest.length > 0) {
+        setDisplayProviders([rest[0], top1, ...rest.slice(1)]);
+      } else {
+        setDisplayProviders([top1]);
+      }
+    } else {
+      setDisplayProviders(reordered);
+    }
+  }, [providers]);
+
+  const handleConfirmChat = () => {
+    if (!selectedProviderForChat || !creditsCtx) return;
+    
+    const result = creditsCtx.contactProvider(selectedProviderForChat.name);
+    if (!result.ok) {
+      setModalError(result.reason || "Error desconocido");
+      return;
+    }
+    
+    setSelectedProviderForChat(null);
+    setModalError(null);
+  };
 
   const handleFile = (f: File | null) => {
     setImage(f);
@@ -37,164 +110,263 @@ export function Chat({ messages, setMessages, onDiagnosis }: Props) {
     }
   };
 
-  const send = async (overrideText?: string) => {
-    const messageText = (overrideText ?? text).trim();
-    if (!messageText || stage) return;
+  const send = () => {
+    const messageText = text.trim();
+    if (!messageText || isProcessing) return;
 
-    setError(null);
-    const userMsg: ChatMessage = {
-      id: crypto.randomUUID(),
-      role: "user",
-      text: messageText,
-      imageUrl: imagePreview ?? undefined,
-      timestamp: Date.now(),
-    };
-
-    const newMessages = [...messages, userMsg];
-    setMessages(newMessages);
+    sendMessage(messageText, image);
     setText("");
-    const sentImage = image;
-    handleFile(null);
+    setImage(null);
+    setImagePreview(null);
     if (fileRef.current) fileRef.current.value = "";
-
-    // Animated pipeline stages
-    setStage("emergency");
-    const stagesTimeline: ProcessingStage[] = ["classification", "matching"];
-    const stageTimers: ReturnType<typeof setTimeout>[] = [];
-    stagesTimeline.forEach((s, i) => {
-      stageTimers.push(setTimeout(() => setStage(s), 600 * (i + 1)));
-    });
-
-    try {
-      const { data, source } = await requestDiagnosis({
-        text: messageText,
-        image: sentImage,
-        history: historyFromMessages(newMessages),
-      });
-
-      // If pipeline indicates follow-up, reflect it briefly
-      if (data.status === "needs_input") setStage("follow_up");
-      else if (data.emergency_analysis.is_emergency) setStage("emergency");
-      else setStage("done");
-
-      const assistantMsg: ChatMessage = {
-        id: crypto.randomUUID(),
-        role: "assistant",
-        text: data.diagnosis?.resumen ?? data.emergency_analysis.motivo ?? "Resultado listo",
-        diagnosis: data,
-        timestamp: Date.now(),
-      };
-      // small pause so user perceives the final stage label
-      await new Promise((r) => setTimeout(r, 250));
-      setMessages((prev) => [...prev, assistantMsg]);
-      onDiagnosis(data, source);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Error inesperado");
-    } finally {
-      stageTimers.forEach(clearTimeout);
-      setStage(null);
-    }
-  };
-
-  const clear = () => {
-    setMessages([]);
-    setError(null);
   };
 
   return (
-    <div className="flex h-full flex-col rounded-2xl border border-border bg-card shadow-[var(--shadow-card)]">
-      <div className="flex items-center justify-between border-b border-border px-5 py-3">
-        <div>
-          <h2 className="text-sm font-semibold text-card-foreground">Asistente ServiGuía</h2>
-          <p className="text-xs text-muted-foreground">
-            Pipeline: emergencia → clasificación → seguimiento → recomendación
-          </p>
-        </div>
-        {messages.length > 0 && (
-          <button
-            onClick={clear}
-            className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-            Limpiar
-          </button>
-        )}
-      </div>
-
-      <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto p-5">
-        {messages.length === 0 ? (
-          <ExamplePrompts onPick={(t) => send(t)} />
-        ) : (
-          messages.map((m) => <MessageBubble key={m.id} message={m} />)
-        )}
-
-        {stage && <ProcessingStatus stage={stage} />}
-
-        {error && (
-          <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
-            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-            <span>{error}</span>
-          </div>
-        )}
-      </div>
-
-      <div className="border-t border-border p-4">
-        <InputGuide />
-        {imagePreview && (
-          <div className="mb-3 inline-flex items-center gap-2 rounded-lg border border-border bg-secondary p-2">
-            <img src={imagePreview} alt="Vista previa" className="h-12 w-12 rounded object-cover" />
-            <button
-              onClick={() => {
-                handleFile(null);
-                if (fileRef.current) fileRef.current.value = "";
-              }}
-              className="rounded-md p-1 text-muted-foreground hover:bg-background hover:text-foreground"
-              aria-label="Quitar imagen"
+    <>
+      {/* Modal de visualización de imagen */}
+      {selectedImage && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" 
+          onClick={() => setSelectedImage(null)}
+        >
+          <div className="relative max-w-4xl max-h-full flex flex-col items-end">
+            <button 
+              onClick={(e) => { e.stopPropagation(); setSelectedImage(null); }}
+              className="mb-3 p-2 rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors"
+              aria-label="Cerrar imagen"
             >
-              <X className="h-4 w-4" />
+              <X className="w-5 h-5" />
+            </button>
+            <img 
+              src={selectedImage} 
+              alt="Vista ampliada" 
+              className="max-w-full max-h-[85vh] rounded-xl object-contain shadow-2xl" 
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Modal de confirmación de contacto */}
+      {selectedProviderForChat && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-card w-full max-w-sm rounded-2xl p-6 shadow-xl border border-border">
+            <h3 className="text-xl font-bold mb-3 text-foreground">Confirmar contacto</h3>
+            <p className="text-sm text-muted-foreground mb-6">
+              Vas a iniciar un chat con <span className="font-semibold text-foreground">{selectedProviderForChat.name}</span>. Se descontarán {creditsCtx?.contactCost || 5} créditos de tu saldo.
+            </p>
+            
+            {modalError && (
+              <div className="mb-4 flex items-start gap-2 rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>{modalError}</span>
+              </div>
+            )}
+            
+            <div className="flex justify-end gap-3">
+              <button 
+                onClick={() => {
+                  setSelectedProviderForChat(null);
+                  setModalError(null);
+                }}
+                className="px-4 py-2 rounded-xl text-sm font-medium text-muted-foreground hover:bg-secondary transition-colors"
+              >
+                Cancelar
+              </button>
+              <button 
+                onClick={handleConfirmChat}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium bg-[image:var(--gradient-primary)] text-primary-foreground shadow-[var(--shadow-elegant)] hover:opacity-90 transition-opacity"
+              >
+                <MessageSquare className="h-4 w-4" />
+                Iniciar chat
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="flex h-[calc(100dvh-64px)] flex-col">
+        <div
+          ref={scrollRef}
+          className="hide-scrollbar flex-1 space-y-5 overflow-y-auto overscroll-contain px-4 py-5 sm:px-6"
+        >
+          {messages.length === 0 ? (
+            <div className="flex h-full flex-col items-center justify-center px-4 text-center">
+              <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary">
+                <MessageCircle className="h-7 w-7" />
+              </div>
+              <h2 className="mb-2 text-xl font-semibold text-foreground">
+                Cuéntanos qué problema tienes en casa
+              </h2>
+              <p className="max-w-xs text-base leading-relaxed text-muted-foreground">
+                Escribe tu problema o adjunta una foto.
+              </p>
+            </div>
+          ) : (
+            messages.map((m) => (
+              <MessageBubble 
+                key={m.id} 
+                message={m} 
+                onImageClick={setSelectedImage} 
+              />
+            ))
+          )}
+
+          {/* Proveedores */}
+          {providers.length > 0 && (
+            <div className="flex flex-col gap-3 mt-6 mb-2">
+              <div className="flex items-center gap-2 mb-1">
+                <div className="h-px flex-1 bg-border" />
+                <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wider">
+                  Proveedores Recomendados
+                </h3>
+                <div className="h-px flex-1 bg-border" />
+              </div>
+              
+              {displayProviders.slice(0, visibleCount).map((p) => {
+                // Calcular intersección para mostrar solo subcategorías relevantes (chips)
+                const problemSubs = currentResult?.subcategorias?.map(s => s.toLowerCase().trim()) || [];
+                const matchingSubs = p.subcategories.filter(sub => 
+                  problemSubs.includes(sub.toLowerCase().trim())
+                );
+
+                return (
+                  <div key={p.id} className="border border-border p-4 rounded-2xl shadow-sm bg-card transition-shadow hover:shadow-md flex gap-4 min-h-[116px]">
+                    {/* Columna Izquierda */}
+                    <div className="flex-1 min-w-0 flex flex-col justify-between">
+                      <div>
+                        <h4 className="font-bold text-base sm:text-lg text-foreground truncate">{p.name}</h4>
+                        <p className="text-sm text-muted-foreground capitalize">{p.category}</p>
+                      </div>
+                      
+                      {/* Subcategorías (Espacio reservado para consistencia visual) */}
+                      <div className="flex flex-wrap gap-1.5 mt-3 min-h-[24px] content-end overflow-hidden">
+                        {matchingSubs.map(sub => (
+                          <span 
+                            key={sub} 
+                            className="px-2 py-0.5 bg-secondary text-secondary-foreground text-[11px] font-medium rounded-md border border-border/50 capitalize whitespace-nowrap"
+                          >
+                            {sub}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Columna Derecha */}
+                    <div className="flex flex-col justify-between items-end shrink-0">
+                      <div className="text-right">
+                        <div className="text-sm font-medium text-foreground mb-1">{mapPrice(p.price_evaluation)}</div>
+                        <div className="flex justify-end">{renderStars(p.rating)}</div>
+                      </div>
+                      
+                      <div className="mt-2">
+                        <button
+                          onClick={() => {
+                            setModalError(null);
+                            setSelectedProviderForChat(p);
+                          }}
+                          className="inline-flex items-center gap-1.5 rounded-xl bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-primary/20"
+                        >
+                          <MessageSquare className="h-3.5 w-3.5" />
+                          Iniciar chat
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+              
+              {visibleCount < displayProviders.length && (
+                <div className="flex justify-center mt-2">
+                  <button
+                    onClick={() => setVisibleCount(displayProviders.length)}
+                    className="rounded-full bg-secondary px-5 py-2 text-sm font-medium text-secondary-foreground transition-colors hover:bg-secondary/80 border border-border"
+                  >
+                    Ver más
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {isProcessing && <ProcessingStatus stage="classification" />}
+
+          {error && (
+            <div className="flex items-start gap-2 rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>{error}</span>
+            </div>
+          )}
+        </div>
+
+        <div className="sticky bottom-0 border-t border-border bg-background/95 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur sm:px-4">
+          {messages.length > 0 && (
+            <div className="mb-2 flex justify-end">
+              <button
+                onClick={clearChat}
+                className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                Limpiar conversación
+              </button>
+            </div>
+          )}
+          {imagePreview && (
+            <div className="mb-2 inline-flex items-center gap-2 rounded-xl border border-border bg-secondary p-2">
+              <img src={imagePreview} alt="Vista previa" className="h-12 w-12 rounded-lg object-cover" />
+              <button
+                onClick={() => {
+                  handleFile(null);
+                  if (fileRef.current) fileRef.current.value = "";
+                }}
+                className="rounded-md p-1 text-muted-foreground hover:bg-background hover:text-foreground"
+                aria-label="Quitar imagen"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          )}
+          <div className="flex items-end gap-2 rounded-2xl border border-border bg-card p-2 shadow-sm focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/15">
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
+            />
+            <button
+              onClick={() => fileRef.current?.click()}
+              disabled={isProcessing}
+              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground disabled:opacity-40"
+              aria-label="Adjuntar imagen"
+            >
+              <ImageIcon className="h-5 w-5" />
+            </button>
+            <textarea
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  send();
+                }
+              }}
+              rows={1}
+              placeholder="Escribe tu mensaje…"
+              className="hide-scrollbar min-h-[48px] max-h-32 flex-1 resize-none bg-transparent px-1 py-3 text-base text-foreground outline-none placeholder:text-muted-foreground"
+              disabled={isProcessing}
+            />
+            <button
+              onClick={() => send()}
+              disabled={isProcessing || !text.trim()}
+              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[image:var(--gradient-primary)] text-primary-foreground shadow-[var(--shadow-elegant)] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+              aria-label="Enviar"
+            >
+              <Send className="h-5 w-5" />
             </button>
           </div>
-        )}
-        <div className="flex items-end gap-2 rounded-xl border border-border bg-background p-2 focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/15">
-          <textarea
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                send();
-              }
-            }}
-            rows={2}
-            placeholder="Describe qué falla, dónde y desde cuándo…"
-            className="flex-1 resize-none bg-transparent px-2 py-1.5 text-sm text-foreground outline-none placeholder:text-muted-foreground"
-            disabled={!!stage}
-          />
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
-          />
-          <button
-            onClick={() => fileRef.current?.click()}
-            disabled={!!stage}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground disabled:opacity-40"
-            aria-label="Adjuntar imagen"
-          >
-            <ImageIcon className="h-4 w-4" />
-          </button>
-          <button
-            onClick={() => send()}
-            disabled={!!stage || !text.trim()}
-            className="flex h-9 items-center gap-1.5 rounded-lg bg-[image:var(--gradient-primary)] px-4 text-sm font-medium text-primary-foreground shadow-[var(--shadow-elegant)] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            <Send className="h-4 w-4" />
-            Enviar
-          </button>
         </div>
       </div>
-    </div>
+    </>
   );
 }

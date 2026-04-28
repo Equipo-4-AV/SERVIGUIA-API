@@ -1,79 +1,54 @@
-export type UrgencyLevel = "CRÍTICO" | "MODERADO" | "NORMAL";
+// ============================================================================
+// Tipos Exactos del Backend (Fuente de Verdad)
+// ============================================================================
 
-export interface Provider {
-  id: string;
-  nombre: string;
-  categoria: string;
-  rating: number;
-  badges: string[];
-  rango_precio: string;
-  disponibilidad: string;
-}
+export type Status =
+  | "starting"
+  | "processing"
+  | "completed"
+  | "failed"
+  | "requires_clarification"
+  | "not_found";
 
-export type PipelineStage =
-  | "emergency_check"
-  | "classification"
-  | "follow_up"
-  | "recommendation"
-  | "done";
-
-export type PipelineStatus = "processing" | "needs_input" | "emergency" | "ready" | "error";
-
-export interface EmergencyAnalysis {
-  is_emergency: boolean;
-  nivel_urgencia: UrgencyLevel;
-  accion_inmediata: string | null;
-  numero_emergencia: string | null;
-  motivo: string | null;
-}
-
-export interface DiagnosisBlock {
+export interface ClassificationResult {
   categoria: string | null;
-  subcategoria: string | null;
-  resumen: string;
-  confianza: number; // 0..1
-  pregunta_seguimiento: string | null;
+  subcategorias: string[] | null;
+  es_emergencia: boolean;
+  safety_message: string | null;
 }
 
-export interface RecommendationBlock {
-  ready: boolean;
-  motivo_no_listo: string | null;
-  proveedores: Provider[];
+export interface BackendProvider {
+  id: string;
+  name: string;
+  category: string;
+  rating: number;
+  subcategories: string[];
+  price_evaluation: string;
+  available: string;
 }
 
-export interface InputSummary {
-  texto: string;
-  tiene_imagen: boolean;
-  turno: number;
+export interface StatusResponse {
+  status: Status;
+  history?: { role: "user" | "assistant"; content: string }[];
+  attempts?: number;
+  result?: ClassificationResult | null;
+  error?: string;
+  message?: string; // Mensaje de clarificación (cuando status === 'requires_clarification')
 }
 
-export interface DiagnosisResponse {
-  status: PipelineStatus;
-  stage: PipelineStage;
-  input_summary: InputSummary;
-  emergency_analysis: EmergencyAnalysis;
-  diagnosis: DiagnosisBlock | null;
-  recommendation: RecommendationBlock;
+export interface OutputResponse {
+  status: Status;
+  providers: BackendProvider[];
 }
+
+// ============================================================================
+// Tipos de Estado Frontend (Solo UI)
+// ============================================================================
 
 export interface ChatMessage {
   id: string;
   role: "user" | "assistant";
   text: string;
   imageUrl?: string;
-  diagnosis?: DiagnosisResponse;
   timestamp: number;
-}
-
-export interface ApiStatusResponse {
-  task_id: string;
-  status: "pending" | "running" | "completed" | "failed";
-  progress?: number;
-  error?: string;
-}
-
-export interface DiagnosisRequest {
-  text: string;
-  image?: File | null;
-  history: { role: "user" | "assistant"; text: string }[];
 }
