@@ -40,6 +40,7 @@ export function Chat() {
   const [visibleCount, setVisibleCount] = useState(4);
   const [selectedProviderForChat, setSelectedProviderForChat] = useState<BackendProvider | null>(null);
   const [modalError, setModalError] = useState<string | null>(null);
+  const [showNoCreditsAlert, setShowNoCreditsAlert] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   
@@ -143,6 +144,27 @@ export function Chat() {
               className="max-w-full max-h-[85vh] rounded-xl object-contain shadow-2xl" 
               onClick={(e) => e.stopPropagation()}
             />
+          </div>
+        </div>
+      )}
+
+      {/* Modal de créditos insuficientes */}
+      {showNoCreditsAlert && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-card w-full max-w-sm rounded-2xl p-6 shadow-xl border border-border text-center">
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+              <AlertCircle className="h-6 w-6" />
+            </div>
+            <h3 className="text-xl font-bold mb-2 text-foreground">Créditos insuficientes</h3>
+            <p className="text-sm text-muted-foreground mb-6">
+              No tienes créditos suficientes para iniciar un nuevo chat.
+            </p>
+            <button 
+              onClick={() => setShowNoCreditsAlert(false)}
+              className="w-full inline-flex justify-center items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-medium bg-[image:var(--gradient-primary)] text-primary-foreground shadow-[var(--shadow-elegant)] hover:opacity-90 transition-opacity"
+            >
+              Entendido
+            </button>
           </div>
         </div>
       )}
@@ -262,8 +284,12 @@ export function Chat() {
                       <div className="mt-2">
                         <button
                           onClick={() => {
-                            setModalError(null);
-                            setSelectedProviderForChat(p);
+                            if (creditsCtx && creditsCtx.credits < creditsCtx.contactCost) {
+                              setShowNoCreditsAlert(true);
+                            } else {
+                              setModalError(null);
+                              setSelectedProviderForChat(p);
+                            }
                           }}
                           className="inline-flex items-center gap-1.5 rounded-xl bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-primary/20"
                         >
