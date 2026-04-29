@@ -54,20 +54,38 @@ function Index() {
     <div className="flex min-h-[100dvh] flex-col bg-background">
       <header className="sticky top-0 z-30 border-b border-border bg-background/90 backdrop-blur">
         <div className="mx-auto flex max-w-3xl items-center gap-2.5 px-4 py-3">
-          <img
-            src={logo}
-            alt="ServiApp"
-            className="h-9 w-9 shrink-0 rounded-xl object-cover shadow-[var(--shadow-elegant)]"
-          />
-          <h1 className="flex-1 text-lg font-bold tracking-tight text-foreground">
-            ServiApp
-          </h1>
-          <div
-            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-secondary px-3 py-1 text-sm font-semibold text-secondary-foreground"
-            aria-label={`${credits} créditos disponibles`}
+          <button 
+            onClick={() => {
+              setActiveProvider(null);
+              setChatUnlocked(false);
+            }}
+            className="flex flex-1 items-center gap-2.5 text-left transition-opacity hover:opacity-80"
+            aria-label="Ir al inicio"
           >
-            <Coins className="h-3.5 w-3.5 text-primary" />
-            <span>{credits} créditos</span>
+            <img
+              src={logo}
+              alt="ServiApp"
+              className="h-9 w-9 shrink-0 rounded-xl object-cover shadow-[var(--shadow-elegant)]"
+            />
+            <h1 className="text-lg font-bold tracking-tight text-foreground">
+              ServiApp
+            </h1>
+          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setCredits(prev => prev + 5)}
+              className="text-[10px] font-bold text-muted-foreground opacity-30 hover:opacity-100 transition-opacity px-1.5 py-0.5 rounded border border-border/50 hover:bg-secondary"
+              title="Dev: Añadir 5 créditos"
+            >
+              +5
+            </button>
+            <div
+              className="inline-flex items-center gap-1.5 rounded-full border border-border bg-secondary px-3 py-1 text-sm font-semibold text-secondary-foreground"
+              aria-label={`${credits} créditos disponibles`}
+            >
+              <Coins className="h-3.5 w-3.5 text-primary" />
+              <span>{credits} créditos</span>
+            </div>
           </div>
         </div>
       </header>
@@ -77,7 +95,12 @@ function Index() {
           <div className="flex flex-1 flex-col">
             <div className="flex items-center gap-2 border-b border-border bg-card px-4 py-3">
               <button
-                onClick={() => setActiveProvider(null)}
+                onClick={() => {
+                  setActiveProvider(null);
+                  if (credits < MIN_CREDITS_TO_START) {
+                    setChatUnlocked(false);
+                  }
+                }}
                 className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
                 aria-label="Volver"
               >
