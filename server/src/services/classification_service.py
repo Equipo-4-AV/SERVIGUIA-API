@@ -81,6 +81,7 @@ def _post_process_classification(
         parsed_result.safety_message = (
             "EMERGENCIA DETECTADA: Por favor, llame al 911 de inmediato y evacúe el area si es necesario."
         )
+        return parsed_result
 
     if parsed_result.category not in valid_categories:
         parsed_result.category = "unknown"
@@ -157,6 +158,11 @@ def run_classification(task_id: str, user_text: str, image_bytes: bytes | None =
         final_result = _post_process_classification(
             raw_ai_result, CONFIG.get("_categorias_validas", []), _normalize_subcategory_mapping(CONFIG)
         )
+
+        # Check if its emergency
+        if final_result.is_emergency:
+            _store.set_completed(task_id, final_result)
+            return
 
 
         # Check if we need clarification
