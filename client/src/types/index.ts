@@ -45,10 +45,15 @@ export interface OutputResponse {
 // Tipos de Estado Frontend (Solo UI)
 // ============================================================================
 
+export type ChatMessageType = "text" | "providers" | "separator";
+
 export interface ChatMessage {
   id: string;
-  role: "user" | "assistant";
-  text: string;
+  role: "user" | "assistant" | "system";
+  type?: ChatMessageType;
+  text?: string;
   imageUrl?: string;
   timestamp: number;
+  providers?: BackendProvider[];
+  subcategories?: string[];
 }

@@ -4,7 +4,6 @@ import { startKickoff, sendPrompt, getStatus, getOutput } from '../api';
 
 export function useAgentChat() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [providers, setProviders] = useState<BackendProvider[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [currentResult, setCurrentResult] = useState<StatusResponse['result'] | null>(null);
@@ -25,17 +24,36 @@ export function useAgentChat() {
 
     setError(null);
     
+    const isNewConversation = !taskIdRef.current;
+    
     // Add user message to UI immediately
-    const userMsg: ChatMessage = {
-      id: crypto.randomUUID(),
-      role: "user",
-      text,
-      timestamp: Date.now()
-    };
-    if (image) {
-      userMsg.imageUrl = URL.createObjectURL(image);
-    }
-    setMessages(prev => [...prev, userMsg]);
+    setMessages(prev => {
+      const newMessages = [...prev];
+      if (isNewConversation && prev.length > 0) {
+        const lastMsg = prev[prev.length - 1];
+        if (lastMsg.type !== "separator") {
+          newMessages.push({
+            id: crypto.randomUUID(),
+            role: "system",
+            type: "separator",
+            timestamp: Date.now()
+          });
+        }
+      }
+      
+      const userMsg: ChatMessage = {
+        id: crypto.randomUUID(),
+        role: "user",
+        type: "text",
+        text,
+        timestamp: Date.now()
+      };
+      if (image) {
+        userMsg.imageUrl = URL.createObjectURL(image);
+      }
+      newMessages.push(userMsg);
+      return newMessages;
+    });
     setIsProcessing(true);
 
     try {
@@ -44,7 +62,6 @@ export function useAgentChat() {
       if (!taskId) {
         taskId = await startKickoff(signal);
         taskIdRef.current = taskId;
-        setProviders([]); // Reset providers para la nueva conversación
         setCurrentResult(null);
       }
 
@@ -66,6 +83,7 @@ export function useAgentChat() {
           setMessages(prev => [...prev, {
             id: crypto.randomUUID(),
             role: "assistant",
+            type: "text",
             text: message || lastAssistantMsg || "Necesito más información.",
             timestamp: Date.now()
           }]);
@@ -82,20 +100,32 @@ export function useAgentChat() {
             setMessages(prev => [...prev, {
               id: crypto.randomUUID(),
               role: "assistant",
+              type: "text",
               text: result.safety_message || "¡EMERGENCIA DETECTADA!",
               timestamp: Date.now()
             }]);
           } else {
             // Ya se completó el pipeline, obtenemos proveedores
             const outputRes = await getOutput(taskId, signal);
-            setProviders(outputRes.providers || []);
             
-            setMessages(prev => [...prev, {
-              id: crypto.randomUUID(),
-              role: "assistant",
-              text: lastAssistantMsg || "Diagnóstico completado. Aquí están los proveedores recomendados:",
-              timestamp: Date.now()
-            }]);
+            setMessages(prev => [
+              ...prev,
+              {
+                id: crypto.randomUUID(),
+                role: "assistant",
+                type: "text",
+                text: lastAssistantMsg || "Diagnóstico completado. Aquí están los proveedores recomendados:",
+                timestamp: Date.now()
+              },
+              {
+                id: crypto.randomUUID(),
+                role: "assistant",
+                type: "providers",
+                providers: outputRes.providers || [],
+                subcategories: result?.subcategorias || [],
+                timestamp: Date.now()
+              }
+            ]);
           }
           
           // La tarea terminó exitosamente, cerramos este taskId
@@ -120,7 +150,6 @@ export function useAgentChat() {
       abortControllerRef.current.abort();
     }
     setMessages([]);
-    setProviders([]);
     setError(null);
     setCurrentResult(null);
     setIsProcessing(false);
@@ -129,7 +158,6 @@ export function useAgentChat() {
 
   return {
     messages,
-    providers,
     isProcessing,
     error,
     currentResult,
