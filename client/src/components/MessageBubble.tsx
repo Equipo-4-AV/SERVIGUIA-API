@@ -1,5 +1,5 @@
 import type { ChatMessage } from "@/types";
-import { Sparkles, User } from "lucide-react";
+import { Sparkles, User, AlertCircle } from "lucide-react";
 
 export function MessageBubble({ message, onImageClick }: { message: ChatMessage; onImageClick?: (url: string) => void }) {
   const isUser = message.role === "user";
@@ -27,13 +27,15 @@ export function MessageBubble({ message, onImageClick }: { message: ChatMessage;
     );
   }
 
+  const isEmergency = message.text?.includes("EMERGENCIA DETECTADA");
+
   return (
     <div className="flex items-start gap-2 sm:gap-3">
-      <div className="mt-1 hidden h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[image:var(--gradient-primary)] text-primary-foreground sm:flex">
-        <Sparkles className="h-4 w-4" />
+      <div className={`mt-1 hidden h-8 w-8 shrink-0 items-center justify-center rounded-full ${isEmergency ? 'bg-destructive' : 'bg-[image:var(--gradient-primary)]'} text-primary-foreground sm:flex`}>
+        {isEmergency ? <AlertCircle className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
       </div>
       <div className="w-full min-w-0 max-w-full space-y-3 sm:max-w-[85%]">
-        <div className="rounded-2xl rounded-tl-sm border border-border bg-card p-4 text-sm text-card-foreground shadow-[var(--shadow-card)]">
+        <div className={`rounded-2xl rounded-tl-sm border p-4 text-sm shadow-[var(--shadow-card)] ${isEmergency ? 'border-destructive bg-destructive/10 text-destructive font-medium' : 'border-border bg-card text-card-foreground'}`}>
           {message.text}
         </div>
       </div>
