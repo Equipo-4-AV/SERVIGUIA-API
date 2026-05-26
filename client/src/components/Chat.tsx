@@ -57,7 +57,6 @@ export function Chat() {
   const [voiceHint, setVoiceHint] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const voiceTimerRef = useRef<number | null>(null);
 
   const creditsCtx = useContext(CreditsContext);
 
@@ -66,14 +65,6 @@ export function Chat() {
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, isProcessing]);
-
-  useEffect(() => {
-    return () => {
-      if (voiceTimerRef.current) {
-        window.clearTimeout(voiceTimerRef.current);
-      }
-    };
-  }, []);
 
   useEffect(() => {
     if (!voiceHint || isVoiceActive) return;
@@ -110,10 +101,6 @@ export function Chat() {
     const messageText = text.trim();
     if (!messageText || isProcessing) return;
 
-    if (voiceTimerRef.current) {
-      window.clearTimeout(voiceTimerRef.current);
-      voiceTimerRef.current = null;
-    }
     setIsVoiceActive(false);
     setVoiceHint(null);
     sendMessage(messageText, image);
@@ -126,20 +113,7 @@ export function Chat() {
   const toggleVoiceDemo = () => {
     if (isProcessing) return;
 
-    if (voiceTimerRef.current) {
-      window.clearTimeout(voiceTimerRef.current);
-      voiceTimerRef.current = null;
-    }
-
     if (isVoiceActive) {
-      setIsVoiceActive(false);
-      setVoiceHint("Dictado pausado.");
-      return;
-    }
-
-    setIsVoiceActive(true);
-    setVoiceHint("Escuchando...");
-    voiceTimerRef.current = window.setTimeout(() => {
       setText((currentText) => {
         const trimmed = currentText.trim();
         if (!trimmed) return VOICE_DEMO_TEXT;
@@ -148,8 +122,11 @@ export function Chat() {
       });
       setIsVoiceActive(false);
       setVoiceHint("Texto dictado listo para enviar.");
-      voiceTimerRef.current = null;
-    }, 1100);
+      return;
+    }
+
+    setIsVoiceActive(true);
+    setVoiceHint("Escuchando...");
   };
 
   return (
