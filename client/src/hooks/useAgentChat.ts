@@ -1,19 +1,22 @@
-import { useState, useRef, useCallback } from 'react';
-import type { ChatMessage, BackendProvider, StatusResponse } from '../types';
-import { startKickoff, sendPrompt, getStatus, getOutput } from '../api';
+import { useState, useRef, useCallback } from "react";
+import type { ChatMessage, BackendProvider, StatusResponse } from "../types";
+import { startKickoff, sendPrompt, getStatus, getOutput } from "../api";
+
+const SERVER_ERROR_MESSAGE =
+  "Error de servidor. Espera unos minutos o llama a emergencias si necesitas ayuda inmediata.";
 
 export function useAgentChat() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [currentResult, setCurrentResult] = useState<StatusResponse['result'] | null>(null);
+  const [currentResult, setCurrentResult] = useState<StatusResponse["result"] | null>(null);
 
   const taskIdRef = useRef<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const sendMessage = useCallback(async (text: string, image: File | null = null) => {
     if (!text.trim()) return;
-    
+
     // Cancel previous request if any
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -23,11 +26,11 @@ export function useAgentChat() {
     const signal = abortController.signal;
 
     setError(null);
-    
+
     const isNewConversation = !taskIdRef.current;
-    
+
     // Add user message to UI immediately
-    setMessages(prev => {
+    setMessages((prev) => {
       const newMessages = [...prev];
       if (isNewConversation && prev.length > 0) {
         const lastMsg = prev[prev.length - 1];
@@ -36,17 +39,17 @@ export function useAgentChat() {
             id: crypto.randomUUID(),
             role: "system",
             type: "separator",
-            timestamp: Date.now()
+            timestamp: Date.now(),
           });
         }
       }
-      
+
       const userMsg: ChatMessage = {
         id: crypto.randomUUID(),
         role: "user",
         type: "text",
         text,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       };
       if (image) {
         userMsg.imageUrl = URL.createObjectURL(image);
@@ -71,51 +74,64 @@ export function useAgentChat() {
       // 3. Polling loop
       while (!signal.aborted) {
         // Esperamos 2 segundos entre cada intento (polling)
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+
         const statusRes = await getStatus(taskId, signal);
         const { status, history, result, message, error: backendError } = statusRes;
 
         // El backend concatena la respuesta del asistente al final del historial
-        const lastAssistantMsg = history?.slice().reverse().find(m => m.role === "assistant")?.content || "";
+        const lastAssistantMsg =
+          history
+            ?.slice()
+            .reverse()
+            .find((m) => m.role === "assistant")?.content || "";
 
         if (status === "requires_clarification") {
-          setMessages(prev => [...prev, {
-            id: crypto.randomUUID(),
-            role: "assistant",
-            type: "text",
-            text: message || lastAssistantMsg || "Necesito más información.",
-            timestamp: Date.now()
-          }]);
-          setIsProcessing(false);
-          break; // Salimos del polling, esperamos siguiente input del usuario
-        }
-        else if (status === "failed" || status === "not_found") {
-          throw new Error(backendError || "Error procesando tu solicitud en el servidor.");
-        }
-        else if (status === "completed") {
-          setCurrentResult(result || null);
-          
-          if (result?.es_emergencia) {
-            setMessages(prev => [...prev, {
+          setMessages((prev) => [
+            ...prev,
+            {
               id: crypto.randomUUID(),
               role: "assistant",
               type: "text",
-              text: result.safety_message || "¡EMERGENCIA DETECTADA!",
-              timestamp: Date.now()
-            }]);
-          } else {
-            // Ya se completó el pipeline, obtenemos proveedores
-            const outputRes = await getOutput(taskId, signal);
-            
-            setMessages(prev => [
+              text: message || lastAssistantMsg || "Necesito más información.",
+              timestamp: Date.now(),
+            },
+          ]);
+          setIsProcessing(false);
+          break; // Salimos del polling, esperamos siguiente input del usuario
+        } else if (status === "failed" || status === "not_found") {
+          if (backendError) {
+            console.error("Error reportado por el servidor:", backendError);
+          }
+          throw new Error(SERVER_ERROR_MESSAGE);
+        } else if (status === "completed") {
+          setCurrentResult(result || null);
+
+          if (result?.es_emergencia) {
+            setMessages((prev) => [
               ...prev,
               {
                 id: crypto.randomUUID(),
                 role: "assistant",
                 type: "text",
-                text: lastAssistantMsg || "Diagnóstico completado. Aquí están los proveedores recomendados:",
-                timestamp: Date.now()
+                text: result.safety_message || "¡EMERGENCIA DETECTADA!",
+                timestamp: Date.now(),
+              },
+            ]);
+          } else {
+            // Ya se completó el pipeline, obtenemos proveedores
+            const outputRes = await getOutput(taskId, signal);
+
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: crypto.randomUUID(),
+                role: "assistant",
+                type: "text",
+                text:
+                  lastAssistantMsg ||
+                  "Diagnóstico completado. Aquí están los proveedores recomendados:",
+                timestamp: Date.now(),
               },
               {
                 id: crypto.randomUUID(),
@@ -123,11 +139,11 @@ export function useAgentChat() {
                 type: "providers",
                 providers: outputRes.providers || [],
                 subcategories: result?.subcategorias || [],
-                timestamp: Date.now()
-              }
+                timestamp: Date.now(),
+              },
             ]);
           }
-          
+
           // La tarea terminó exitosamente, cerramos este taskId
           taskIdRef.current = null;
           setIsProcessing(false);
@@ -135,10 +151,13 @@ export function useAgentChat() {
         }
         // Si status === "starting" o "processing", el loop continúa.
       }
-    } catch (err: any) {
-      if (err.name !== "AbortError" && err.message !== "canceled") {
+    } catch (err: unknown) {
+      const isCanceledError =
+        err instanceof Error && (err.name === "AbortError" || err.message === "canceled");
+
+      if (!isCanceledError) {
         console.error("Error en flujo de chat:", err);
-        setError(err.message || "Ocurrió un error inesperado al conectar con el servidor.");
+        setError(SERVER_ERROR_MESSAGE);
         taskIdRef.current = null; // Reset taskId para no atorarnos en una tarea corrupta
         setIsProcessing(false);
       }
@@ -162,6 +181,6 @@ export function useAgentChat() {
     error,
     currentResult,
     sendMessage,
-    clearChat
+    clearChat,
   };
 }
