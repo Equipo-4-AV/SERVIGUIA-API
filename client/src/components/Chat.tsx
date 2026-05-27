@@ -16,7 +16,13 @@ import type { BackendProvider, ChatMessage } from "@/types";
 import { CreditsContext, type CreditsContextValue } from "@/contexts/CreditsContext";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
-const VOICE_DEMO_TEXT = "Necesito reparar una fuga de agua en la cocina.";
+// Web Speech API type augmentation for browsers that only expose webkit-prefixed version
+declare global {
+  interface Window {
+    SpeechRecognition: typeof SpeechRecognition;
+    webkitSpeechRecognition: typeof SpeechRecognition;
+  }
+}
 
 const mapPrice = (priceStr: string) => {
   const mapping: Record<string, string> = {
@@ -54,9 +60,20 @@ export function Chat() {
   const [modalError, setModalError] = useState<string | null>(null);
   const [showNoCreditsAlert, setShowNoCreditsAlert] = useState(false);
   const [isVoiceActive, setIsVoiceActive] = useState(false);
+  // isTranscribing: true between recognition.stop() and onresult/onerror (RF-STT-03)
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  // Countdown seconds remaining (max 45s) shown in the status bar
+  const [recordingTimeLeft, setRecordingTimeLeft] = useState<number | null>(null);
   const [voiceHint, setVoiceHint] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  // Persistent ref so onend/onerror can always reach the current instance (RF-STT-02)
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  // Accumulates all confirmed (final) segments across multiple onresult events
+  const finalTranscriptRef = useRef<string>("");
+  // Timer refs for the 45-second auto-stop and the per-second countdown
+  const autoStopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const creditsCtx = useContext(CreditsContext);
 
@@ -67,11 +84,27 @@ export function Chat() {
   }, [messages, isProcessing]);
 
   useEffect(() => {
-    if (!voiceHint || isVoiceActive) return;
+    // Keep hint visible while recording or transcribing; auto-dismiss otherwise
+    if (!voiceHint || isVoiceActive || isTranscribing) return;
 
-    const timer = window.setTimeout(() => setVoiceHint(null), 2400);
+    const timer = window.setTimeout(() => setVoiceHint(null), 4000);
     return () => window.clearTimeout(timer);
-  }, [voiceHint, isVoiceActive]);
+  }, [voiceHint, isVoiceActive, isTranscribing]);
+
+  // Cleanup recognition and timers on unmount to avoid memory leaks
+  useEffect(() => {
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.onstart = null;
+        recognitionRef.current.onresult = null;
+        recognitionRef.current.onerror = null;
+        recognitionRef.current.onend = null;
+        try { recognitionRef.current.abort(); } catch { /* already stopped */ }
+      }
+      if (autoStopTimerRef.current) clearTimeout(autoStopTimerRef.current);
+      if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
+    };
+  }, []);
 
   const handleConfirmChat = () => {
     if (!selectedProviderForChat || !creditsCtx) return;
@@ -110,23 +143,166 @@ export function Chat() {
     if (fileRef.current) fileRef.current.value = "";
   };
 
-  const toggleVoiceDemo = () => {
+  /**
+   * Toggles Web Speech API recording on/off.
+   * First click  → starts continuous recognition, max 45 s  (RF-STT-01, RF-STT-02)
+   * Second click → stops immediately                         (RF-STT-02)
+   * Shows interim transcription live in the textarea (semi-real-time).
+   * Auto-sends on session end using all accumulated final segments.
+   */
+  const toggleVoiceRecording = () => {
     if (isProcessing) return;
 
+    // [RF-STT-02] Second click: stop immediately
     if (isVoiceActive) {
-      setText((currentText) => {
-        const trimmed = currentText.trim();
-        if (!trimmed) return VOICE_DEMO_TEXT;
-        if (currentText.includes(VOICE_DEMO_TEXT)) return currentText;
-        return `${currentText.trimEnd()} ${VOICE_DEMO_TEXT}`;
-      });
-      setIsVoiceActive(false);
-      setVoiceHint("Texto dictado listo para enviar.");
+      recognitionRef.current?.stop();
       return;
     }
 
-    setIsVoiceActive(true);
-    setVoiceHint("Escuchando...");
+    // Check browser support
+    const SpeechRecognitionCtor =
+      window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (!SpeechRecognitionCtor) {
+      setVoiceHint(
+        "Tu navegador no soporta reconocimiento de voz. Por favor escribe tu mensaje.",
+      );
+      return;
+    }
+
+    // ── Helper: clear the 45s auto-stop + 1s countdown timers ──
+    const clearTimers = () => {
+      if (autoStopTimerRef.current) {
+        clearTimeout(autoStopTimerRef.current);
+        autoStopTimerRef.current = null;
+      }
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current);
+        countdownIntervalRef.current = null;
+      }
+      setRecordingTimeLeft(null);
+    };
+
+    const recognition = new SpeechRecognitionCtor();
+    recognition.lang = "es-ES";         // [RF-STT-05] Spanish
+    recognition.continuous = true;      // keep listening up to 45 s
+    recognition.interimResults = true;  // semi-real-time transcription
+
+    // [RF-STT-01] Session started
+    recognition.onstart = () => {
+      setIsVoiceActive(true);
+      setIsTranscribing(false);
+      setVoiceHint(null);
+      setText("");
+      finalTranscriptRef.current = "";
+
+      // [RF-M04] STT mode is text-only: discard any attached image immediately
+      setImage(null);
+      setImagePreview(null);
+      if (fileRef.current) fileRef.current.value = "";
+
+      setRecordingTimeLeft(45);
+
+      // Per-second countdown
+      countdownIntervalRef.current = setInterval(() => {
+        setRecordingTimeLeft((prev) => {
+          if (prev === null || prev <= 1) {
+            if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
+            countdownIntervalRef.current = null;
+            return null;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+
+      // Hard stop after 45 s
+      autoStopTimerRef.current = setTimeout(() => {
+        recognitionRef.current?.stop();
+      }, 45_000);
+    };
+
+    // Semi-real-time: accumulate finals, show interim live in textarea
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
+      let interimTranscript = "";
+
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const segment = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          finalTranscriptRef.current += segment + " ";
+        } else {
+          interimTranscript += segment;
+        }
+      }
+
+      // Show confirmed text + what is being spoken right now
+      setText((finalTranscriptRef.current + interimTranscript).trimStart());
+    };
+
+    // [RF-STT-04 / RF-STT-07] Error handling
+    recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+      console.error("[STT] error:", event.error);
+      clearTimers();
+      setIsTranscribing(false);
+      setIsVoiceActive(false);
+      setText("");
+      finalTranscriptRef.current = "";
+
+      if (event.error === "aborted") {
+        setVoiceHint("Grabación cancelada.");
+      } else if (event.error === "not-allowed" || event.error === "service-not-allowed") {
+        setVoiceHint(
+          "No se pudo acceder al micrófono. Verifica los permisos del navegador o escribe tu mensaje.",
+        );
+      } else if (event.error === "no-speech") {
+        setVoiceHint("No detectamos ninguna voz. Intenta de nuevo o escribe tu mensaje.");
+      } else {
+        setVoiceHint("No pudimos procesar el audio. Intenta de nuevo o escribe tu mensaje.");
+      }
+    };
+
+    // [RF-STT-02 / RF-STT-06] Session ended — auto-send accumulated text (text-only, RF-M04)
+    recognition.onend = () => {
+      clearTimers();
+      setIsVoiceActive(false);
+      setIsTranscribing(false);
+
+      const finalText = finalTranscriptRef.current.trim();
+      // Clear immediately — guards against any edge case where onend could fire twice
+      finalTranscriptRef.current = "";
+
+      if (finalText) {
+        // [RF-M04] Send ONLY the transcribed text, never with an image
+        sendMessage(finalText, null);
+        setText("");
+        setVoiceHint("✓ Mensaje de voz enviado.");
+      } else {
+        setText("");
+      }
+    };
+
+    recognitionRef.current = recognition;
+
+    try {
+      recognition.start();
+    } catch (err) {
+      console.error("[STT] Could not start recognition:", err);
+      setVoiceHint("No se pudo iniciar el micrófono. Intenta de nuevo.");
+    }
+  };
+
+  const cancelVoiceRecording = () => {
+    if (!recognitionRef.current) return;
+
+    finalTranscriptRef.current = "";
+    setText("");
+    try {
+      recognitionRef.current.abort();
+    } catch (err) {
+      console.error("[STT] Error aborting recognition:", err);
+      setIsVoiceActive(false);
+      setIsTranscribing(false);
+      setVoiceHint("Grabación cancelada.");
+    }
   };
 
   return (
@@ -276,8 +452,8 @@ export function Chat() {
         </div>
 
         <div className="sticky bottom-0 border-t border-border bg-background/95 px-2.5 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur sm:px-4">
-          {messages.length > 0 && (
-            <div className="mb-2 flex justify-end">
+          {((messages.length > 0) && !isVoiceActive) && (
+            <div className="mb-2 flex justify-start">
               <button
                 onClick={clearChat}
                 className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
@@ -306,15 +482,73 @@ export function Chat() {
               </button>
             </div>
           )}
-          {voiceHint && (
+          {/* [RF-STT-03] Voice status bar — non-blocking, auto-dismissed */}
+          {(voiceHint || isTranscribing || isVoiceActive) && (
             <div
-              className="mb-2 flex items-center gap-2 px-2 text-xs font-medium text-primary"
+              className="mb-2 flex items-center justify-between gap-2 px-2 text-xs font-medium"
               aria-live="polite"
+              role="status"
             >
-              <span
-                className={`h-2 w-2 rounded-full ${isVoiceActive ? "animate-pulse bg-primary" : "bg-success"}`}
-              />
-              <span>{voiceHint}</span>
+              <div className="flex items-center gap-2">
+                {isVoiceActive ? (
+                  /* ── Recording: red pulse + live countdown ── */
+                  <>
+                    <span className="relative flex h-2.5 w-2.5 shrink-0">
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-destructive opacity-75" />
+                      <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-destructive" />
+                    </span>
+                    <span className="text-destructive">
+                      Escuchando…{recordingTimeLeft !== null ? ` ${recordingTimeLeft}s` : ""}
+                    </span>
+                    {recordingTimeLeft !== null && (
+                      <span className="ml-1 text-muted-foreground/70">/ 45s</span>
+                    )}
+                  </>
+                ) : isTranscribing ? (
+                  /* ── Post-recording spinner (RF-STT-03) ── */
+                  <>
+                    <span className="relative flex h-2.5 w-2.5 shrink-0">
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
+                      <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-amber-500" />
+                    </span>
+                    <span className="text-amber-600 dark:text-amber-400">Transcribiendo voz…</span>
+                  </>
+                ) : (
+                  /* ── Static hint: success / error ── */
+                  <>
+                    <span
+                      className={`h-2 w-2 shrink-0 rounded-full ${
+                        voiceHint?.startsWith("✓")
+                          ? "bg-emerald-500"
+                          : voiceHint?.includes("No") || voiceHint?.includes("pudo")
+                            ? "bg-destructive"
+                            : "bg-primary"
+                      }`}
+                    />
+                    <span
+                      className={`${
+                        voiceHint?.startsWith("✓")
+                          ? "text-emerald-600 dark:text-emerald-400"
+                          : voiceHint?.includes("No") || voiceHint?.includes("pudo")
+                            ? "text-destructive"
+                            : "text-primary"
+                      }`}
+                    >
+                      {voiceHint}
+                    </span>
+                  </>
+                )}
+              </div>
+              {isVoiceActive && (
+                <button
+                  onClick={cancelVoiceRecording}
+                  className="flex items-center gap-1 text-destructive/80 hover:text-destructive transition-colors duration-150 rounded px-1.5 py-0.5 hover:bg-destructive/5 font-semibold"
+                  title="Cancelar audio"
+                >
+                  <X className="h-3.5 w-3.5" />
+                  <span>Cancelar audio</span>
+                </button>
+              )}
             </div>
           )}
           <div className="flex min-w-0 items-end gap-1.5 rounded-2xl border border-border bg-card p-1.5 shadow-sm focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/15 sm:gap-2 sm:p-2">
@@ -327,7 +561,7 @@ export function Chat() {
             />
             <button
               onClick={() => fileRef.current?.click()}
-              disabled={isProcessing}
+              disabled={isProcessing || isVoiceActive}
               className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground disabled:opacity-40 sm:h-12 sm:w-12"
               aria-label="Adjuntar imagen"
             >
@@ -335,7 +569,7 @@ export function Chat() {
             </button>
             <textarea
               value={text}
-              onChange={(e) => setText(e.target.value)}
+              onChange={(e) => { if (!isVoiceActive) setText(e.target.value); }}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
@@ -343,32 +577,43 @@ export function Chat() {
                 }
               }}
               rows={1}
-              placeholder="Escribe o dicta tu mensaje..."
-              className="hide-scrollbar min-h-[44px] max-h-32 min-w-0 flex-1 resize-none bg-transparent px-1 py-2.5 text-base text-foreground outline-none placeholder:text-muted-foreground sm:min-h-[48px] sm:py-3"
+              placeholder={isVoiceActive ? "Escuchando tu voz…" : "Escribe o dicta tu mensaje..."}
+              className={`hide-scrollbar min-h-[44px] max-h-32 min-w-0 flex-1 resize-none bg-transparent px-1 py-2.5 text-base outline-none placeholder:text-muted-foreground sm:min-h-[48px] sm:py-3 ${
+                isVoiceActive ? "text-destructive/80 cursor-default select-none" : "text-foreground"
+              }`}
               disabled={isProcessing}
+              readOnly={isVoiceActive}
             />
             <TooltipProvider delayDuration={150}>
               <Tooltip>
                 <TooltipTrigger asChild>
+                  {/* [RF-STT-01 / RF-STT-02] Mic button — red/pulsing while recording */}
                   <button
-                    onClick={toggleVoiceDemo}
-                    disabled={isProcessing}
-                    aria-label={isVoiceActive ? "Pausar dictado" : "Dictar mensaje"}
+                    onClick={toggleVoiceRecording}
+                    disabled={isProcessing || isTranscribing}
+                    aria-label={isVoiceActive ? "Detener dictado" : "Dictar mensaje"}
                     aria-pressed={isVoiceActive}
-                    className={`relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition-colors disabled:opacity-40 sm:h-12 sm:w-12 ${
+                    className={`relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition-all duration-200 disabled:opacity-40 sm:h-12 sm:w-12 ${
                       isVoiceActive
-                        ? "bg-primary/10 text-primary ring-2 ring-primary/30"
-                        : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                        ? "bg-destructive/10 text-destructive ring-2 ring-destructive/40 scale-105"
+                        : isTranscribing
+                          ? "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                          : "text-muted-foreground hover:bg-secondary hover:text-foreground"
                     }`}
                   >
+                    {/* Ripple effect while actively listening */}
                     {isVoiceActive && (
-                      <span className="absolute h-8 w-8 animate-ping rounded-full bg-primary/20" />
+                      <span className="absolute h-8 w-8 animate-ping rounded-full bg-destructive/25" />
                     )}
                     <Mic className="relative h-5 w-5" />
                   </button>
                 </TooltipTrigger>
                 <TooltipContent side="top">
-                  {isVoiceActive ? "Escuchando..." : "Dictar mensaje"}
+                  {isVoiceActive
+                    ? "Clic para detener y procesar"
+                    : isTranscribing
+                      ? "Transcribiendo…"
+                      : "Dictar mensaje (español)"}
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
