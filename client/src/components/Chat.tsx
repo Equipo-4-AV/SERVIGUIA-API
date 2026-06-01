@@ -67,6 +67,7 @@ export function Chat() {
   const [voiceHint, setVoiceHint] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   // Persistent ref so onend/onerror can always reach the current instance (RF-STT-02)
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   // Accumulates all confirmed (final) segments across multiple onresult events
@@ -90,6 +91,13 @@ export function Chat() {
     const timer = window.setTimeout(() => setVoiceHint(null), 4000);
     return () => window.clearTimeout(timer);
   }, [voiceHint, isVoiceActive, isTranscribing]);
+
+  // Auto-scroll textarea to bottom when text overflows during voice dictation
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.scrollTop = textareaRef.current.scrollHeight;
+    }
+  }, [text]);
 
   // Cleanup recognition and timers on unmount to avoid memory leaks
   useEffect(() => {
@@ -196,11 +204,6 @@ export function Chat() {
       setText("");
       finalTranscriptRef.current = "";
 
-      // [RF-M04] STT mode is text-only: discard any attached image immediately
-      setImage(null);
-      setImagePreview(null);
-      if (fileRef.current) fileRef.current.value = "";
-
       setRecordingTimeLeft(45);
 
       // Per-second countdown
@@ -260,7 +263,7 @@ export function Chat() {
       }
     };
 
-    // [RF-STT-02 / RF-STT-06] Session ended — auto-send accumulated text (text-only, RF-M04)
+    // [RF-STT-02 / RF-STT-06] Session ended — auto-send accumulated text with any pre-selected image
     recognition.onend = () => {
       clearTimers();
       setIsVoiceActive(false);
@@ -271,9 +274,11 @@ export function Chat() {
       finalTranscriptRef.current = "";
 
       if (finalText) {
-        // [RF-M04] Send ONLY the transcribed text, never with an image
-        sendMessage(finalText, null);
+        sendMessage(finalText, image);
         setText("");
+        setImage(null);
+        setImagePreview(null);
+        if (fileRef.current) fileRef.current.value = "";
         setVoiceHint("✓ Mensaje de voz enviado.");
       } else {
         setText("");
@@ -568,6 +573,7 @@ export function Chat() {
               <ImageIcon className="h-5 w-5" />
             </button>
             <textarea
+              ref={textareaRef}
               value={text}
               onChange={(e) => { if (!isVoiceActive) setText(e.target.value); }}
               onKeyDown={(e) => {
@@ -578,7 +584,7 @@ export function Chat() {
               }}
               rows={1}
               placeholder={isVoiceActive ? "Escuchando tu voz…" : "Escribe o dicta tu mensaje..."}
-              className={`hide-scrollbar min-h-[44px] max-h-32 min-w-0 flex-1 resize-none bg-transparent px-1 py-2.5 text-base outline-none placeholder:text-muted-foreground sm:min-h-[48px] sm:py-3 ${
+              className={`hide-scrollbar min-h-[44px] max-h-32 min-w-0 flex-1 resize-none bg-transparent px-1 py-2.5 text-base outline-none placeholder:text-muted-foreground overflow-y-auto sm:min-h-[48px] sm:py-3 ${
                 isVoiceActive ? "text-destructive/80 cursor-default select-none" : "text-foreground"
               }`}
               disabled={isProcessing}
