@@ -24,7 +24,7 @@ Don't worry about hot-loading. Docker Compose uses watch to stablish a sync conn
 > Make sure Docker Desktop is running
 
 ```bash
-docker compose -f docker/compose.yaml watch
+docker compose -f docker/compose.yaml --env-file .env watch
 ```
 
 Create your env file once at project root:

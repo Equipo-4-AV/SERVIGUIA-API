@@ -22,6 +22,8 @@ services:
           path: ../server/requirements.txt
         - action: rebuild
           path: ../server/Dockerfile
+    environment:
+      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}?schema=public
 
   client:
     build:
@@ -47,3 +49,21 @@ services:
           path: ../client/package-lock.json
         - action: rebuild
           path: ../client/Dockerfile
+  db:
+    image: postgres:16-alpine
+    container_name: serviguia-db
+    restart: always
+    env_file:
+      - ../.env
+    environment:
+      # Francisco: aparentemente no necesitas ni crear la db o las credenciales desde antes
+      # simplemente con que las declares la primeras vez que construyas la imagen con las credenciales en el env
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+volumes:
+  postgres_data:
