@@ -6,3 +6,5 @@ python-multipart
 pydantic
 pytest
 slowapi
+sqlmodel
+psycopg2-binary
