@@ -584,7 +584,7 @@ export function Chat() {
               }}
               rows={1}
               placeholder={isVoiceActive ? "Escuchando tu voz…" : "Escribe o dicta tu mensaje..."}
-              className={`hide-scrollbar min-h-[44px] max-h-32 min-w-0 flex-1 resize-none bg-transparent px-1 py-2.5 text-base outline-none placeholder:text-muted-foreground overflow-y-auto sm:min-h-[48px] sm:py-3 ${
+              className={`hide-scrollbar max-h-32 min-w-0 flex-1 resize-none bg-transparent px-2 py-2 text-base leading-6 outline-none placeholder:text-muted-foreground overflow-y-auto sm:py-3 ${
                 isVoiceActive ? "text-destructive/80 cursor-default select-none" : "text-foreground"
               }`}
               disabled={isProcessing}
