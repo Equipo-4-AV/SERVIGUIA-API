@@ -11,10 +11,7 @@ This document describes how the database is initialized, models are defined, see
 
 ---
 
-## SQLModel Schema Initialization
-
-The database tables are declared directly as Python classes in:
-- [db_models.py](file:///d:/VS%20Python/SERVIGUIA_API/server/src/data/db_models.py)
+## SQLModel Schema Initializations
 
 Tables are automatically created/initialized via the Python code itself using SQLAlchemy metadata:
 ```python
@@ -24,7 +21,7 @@ from src.data.database import engine
 SQLModel.metadata.create_all(engine)
 ```
 
-This initialization logic is wrapped inside the `init_db()` helper function inside [database.py](file:///d:/VS%20Python/SERVIGUIA_API/server/src/data/database.py).
+This initialization logic is wrapped inside the `init_db()` helper function inside [database.py]
 
 ---
 
