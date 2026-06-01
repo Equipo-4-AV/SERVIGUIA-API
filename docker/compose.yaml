@@ -22,8 +22,6 @@ services:
           path: ../server/requirements.txt
         - action: rebuild
           path: ../server/Dockerfile
-    environment:
-      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}?schema=public
 
   client:
     build:
