@@ -3,8 +3,11 @@ uvicorn
 openai
 python-dotenv
 python-multipart
-pydantic
+pydantic[email]
 pytest
 slowapi
 sqlmodel
 psycopg2-binary
+python-jose[cryptography]
+passlib[bcrypt]
+bcrypt

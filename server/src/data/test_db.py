@@ -2,7 +2,6 @@ import os
 from dotenv import load_dotenv
 from sqlmodel import Session, select
 
-# Load environment variables
 load_dotenv()
 
 from src.data.db_models import Category, Subcategory, Badge, Worker
@@ -14,7 +13,6 @@ def main():
 
     print("Opening database session...")
     with Session(engine) as session:
-        # Count items
         num_categories = len(session.exec(select(Category)).all())
         num_subcategories = len(session.exec(select(Subcategory)).all())
         num_badges = len(session.exec(select(Badge)).all())
@@ -26,11 +24,10 @@ def main():
         print(f" - Badges: {num_badges}")
         print(f" - Workers: {num_workers}")
 
-        # Fetch a sample worker with relationships
         print("\nFetching sample worker...")
         worker = session.exec(select(Worker)).first()
         if worker:
-            print(f"Worker: {worker.name} (ID: {worker.id})")
+            print(f"Worker: {worker.name} (UUID: {worker.id}, Code: {worker.code})")
             print(f" - Category: {worker.category.name if worker.category else 'None'}")
             sub_names = [sub.name for sub in worker.subcategories]
             badge_names = [badge.name for badge in worker.badges]
@@ -38,7 +35,7 @@ def main():
             print(f" - Badges: {', '.join(badge_names)}")
             print(f" - Phone: {worker.phone} | Hourly Rate: ${worker.hourly_rate}")
         else:
-            print("No workers found in database. Run the seed script first: python -m src.data.seed")
+            print("No workers found. Run the seed script first: python -m src.data.seed")
 
 if __name__ == "__main__":
     main()
