@@ -52,15 +52,11 @@ To populate the database tables with categories and keywords from `pesos.json` a
 docker compose -f docker/compose.yaml --env-file .env exec server python -m src.data.seed
 ```
 
-### When schema changes (new tables, new columns), wipe the old DB volume
+### Run Unit Tests
+Run the command in a different terminal while the container is running:
 ```bash
-docker compose -f docker/compose.yaml down -v
+docker exec -it <your-server-docker-container-id>  pytest
 ```
-#### Rebuild with new dependencies and code
-```bash
-docker compose -f docker/compose.yaml --env-file .env build server
-```
-Then you can run the container with the standard command
 
 > [!TIP]
 > `venv` is Python virtual environment, while `.env` is environment variables file.

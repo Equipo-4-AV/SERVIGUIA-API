@@ -41,11 +41,7 @@ def init_db():
     """
     Import models to register them in SQLModel metadata and create the database tables.
     """
-    from src.data.db_models import (
-        Category, Subcategory, Badge, Worker,
-        WorkerSubcategoryLink, WorkerBadgeLink,
-        User, RefreshToken
-    )
+    from src.data.db_models import Category, Subcategory, Badge, Worker, WorkerSubcategoryLink, WorkerBadgeLink
     SQLModel.metadata.create_all(engine)
 
 def get_session():

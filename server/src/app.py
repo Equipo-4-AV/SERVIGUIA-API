@@ -12,7 +12,6 @@ from src.routes.status import router as status_router #!not fully implemented bu
 from src.routes.enqueue_prompt import router as enqueue_prompt_router
 from src.routes.kickoff import router as kickoff_router
 from src.routes.output import router as output_router
-from src.routes.auth import router as auth_router
 
 #middleware
 from src.middlewares.internal_error_handler import InternalErrorHandler
@@ -69,7 +68,6 @@ app.include_router(status_router, prefix="/api")
 app.include_router(output_router, prefix="/api")
 app.include_router(kickoff_router, prefix="/api")
 app.include_router(enqueue_prompt_router, prefix="/api")
-app.include_router(auth_router, prefix="/api")
 
 
 @app.exception_handler(RequestValidationError)
