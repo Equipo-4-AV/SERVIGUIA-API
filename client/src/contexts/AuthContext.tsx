@@ -1,4 +1,12 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 
 import {
   loginUser as requestLogin,
@@ -13,6 +21,7 @@ import {
   getRefreshToken,
   saveAccessToken,
   saveAuthTokens,
+  subscribeToAuthChanges,
 } from "@/features/auth/tokenStorage";
 
 interface AuthContextValue {
@@ -28,6 +37,12 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [accessToken, setAccessToken] = useState<string | null>(() => getAccessToken());
+
+  useEffect(() => {
+    return subscribeToAuthChanges(() => {
+      setAccessToken(getAccessToken());
+    });
+  }, []);
 
   const login = useCallback(async (payload: LoginRequest) => {
     const tokens = await requestLogin(payload);

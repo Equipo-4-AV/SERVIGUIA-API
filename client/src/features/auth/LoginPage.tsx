@@ -1,4 +1,5 @@
-import { Link, useNavigate } from "@tanstack/react-router";
+import { useNavigate } from "@tanstack/react-router";
+import { ArrowRight, LogOut } from "lucide-react";
 
 import logo from "@/assets/logo.png";
 import { useAuth } from "@/contexts/AuthContext";
@@ -7,32 +8,24 @@ import type { LoginCredentials, RegisterCredentials } from "./types";
 
 export function LoginPage() {
   const navigate = useNavigate();
-  const { isAuthenticated, login, register } = useAuth();
+  const { isAuthenticated, login, register, logout } = useAuth();
 
-  const navigateAfterAuth = () => {
-    if (typeof window === "undefined") {
-      void navigate({ to: "/" });
-      return;
-    }
-
-    const redirect = new URLSearchParams(window.location.search).get("redirect");
-
-    if (redirect && redirect.startsWith("/") && !redirect.startsWith("//")) {
-      window.location.assign(redirect);
-      return;
-    }
-
+  const enterApp = () => {
     void navigate({ to: "/" });
   };
 
   const handleLogin = async (credentials: LoginCredentials) => {
     await login(credentials);
-    navigateAfterAuth();
+    enterApp();
   };
 
   const handleRegister = async (credentials: RegisterCredentials) => {
     await register(credentials);
-    navigateAfterAuth();
+    enterApp();
+  };
+
+  const handleLogout = async () => {
+    await logout();
   };
 
   return (
@@ -62,21 +55,34 @@ export function LoginPage() {
             </div>
 
             {isAuthenticated && (
-              <div className="mb-5 rounded-xl border border-success/30 bg-success/10 p-3 text-sm text-success">
-                Ya tienes una sesion activa. Puedes volver al inicio o iniciar con otra cuenta.
+              <div className="mb-5 rounded-xl border border-success/30 bg-success/10 p-4 text-sm text-success">
+                <p className="font-medium">Sesion activa</p>
+                <p className="mt-1 text-success/90">
+                  Ya puedes entrar a ServiApp o cerrar sesion para usar otra cuenta.
+                </p>
+                <div className="mt-4 grid gap-2 sm:grid-cols-[1fr_auto]">
+                  <button
+                    type="button"
+                    onClick={enterApp}
+                    className="inline-flex h-11 items-center justify-center gap-1.5 rounded-xl bg-success px-4 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+                  >
+                    Entrar a ServiApp
+                    <ArrowRight className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    className="inline-flex h-11 items-center justify-center gap-1.5 rounded-xl border border-success/40 bg-card px-4 text-sm font-semibold text-success transition-colors hover:bg-success/10"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    Cerrar sesion
+                  </button>
+                </div>
               </div>
             )}
 
-            <LoginForm onLogin={handleLogin} onRegister={handleRegister} />
+            {!isAuthenticated && <LoginForm onLogin={handleLogin} onRegister={handleRegister} />}
 
-            <div className="mt-6 border-t border-border pt-5 text-center">
-              <Link
-                to="/"
-                className="text-sm font-medium text-primary transition-colors hover:text-primary/80"
-              >
-                Volver al inicio
-              </Link>
-            </div>
           </section>
         </div>
       </div>

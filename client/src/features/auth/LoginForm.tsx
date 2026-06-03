@@ -23,6 +23,41 @@ const MIN_PASSWORD_LENGTH = 6;
 
 type AuthMode = "login" | "register";
 
+function getAuthErrorMessage(error: unknown, mode: AuthMode) {
+  const response = (error as { response?: { status?: number; data?: { detail?: string } } })
+    .response;
+  const status = response?.status;
+  const detail = response?.data?.detail;
+
+  if (status === 409) {
+    return "Ese correo ya esta registrado. Intenta iniciar sesion.";
+  }
+
+  if (status === 401) {
+    return "Correo o contrasena incorrectos.";
+  }
+
+  if (status === 403) {
+    return "La cuenta esta desactivada.";
+  }
+
+  if (status === 422) {
+    return "Revisa que el correo y la contrasena tengan un formato valido.";
+  }
+
+  if (status && status >= 500) {
+    return "El servidor no pudo completar la solicitud. Revisa que la base de datos este inicializada.";
+  }
+
+  if (detail) {
+    return detail;
+  }
+
+  return mode === "register"
+    ? "No pudimos crear tu cuenta. Revisa tus datos e intenta de nuevo."
+    : "No pudimos iniciar sesion. Revisa tus datos e intenta de nuevo.";
+}
+
 function validateAuth(
   credentials: LoginCredentials,
   mode: AuthMode,
@@ -103,12 +138,9 @@ export function LoginForm({ onLogin, onRegister }: LoginFormProps) {
       } else {
         await new Promise((resolve) => window.setTimeout(resolve, 450));
       }
-    } catch {
+    } catch (error) {
       setErrors({
-        form:
-          mode === "register"
-            ? "No pudimos crear tu cuenta. Revisa tus datos e intenta de nuevo."
-            : "No pudimos iniciar sesion. Revisa tus datos e intenta de nuevo.",
+        form: getAuthErrorMessage(error, mode),
       });
     } finally {
       setIsSubmitting(false);
