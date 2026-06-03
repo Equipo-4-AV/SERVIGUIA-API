@@ -10,4 +10,4 @@ sqlmodel
 psycopg2-binary
 python-jose[cryptography]
 passlib[bcrypt]
-bcrypt
+bcrypt<4.0.0

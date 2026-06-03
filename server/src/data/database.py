@@ -9,20 +9,20 @@ from urllib.parse import urlparse, urlunparse, parse_qs, urlencode
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 connect_args = {}
-if DATABASE_URL:
+if DATABASE_URL and DATABASE_URL.startswith(("postgres://", "postgresql://")):
     if DATABASE_URL.startswith("postgres://"):
         DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
-        
+
     parsed = urlparse(DATABASE_URL)
     query_params = parse_qs(parsed.query)
-    
+
     # Remove 'schema' parameter so psycopg2 doesn't complain
     if "schema" in query_params:
         schema_name = query_params.pop("schema")[0]
         if schema_name and schema_name != "public":
             # Pass custom schema to postgres search_path
             connect_args["options"] = f"-c search_path={schema_name}"
-            
+
     # Rebuild URL query string without schema
     new_query = urlencode(query_params, doseq=True)
     DATABASE_URL = urlunparse((
