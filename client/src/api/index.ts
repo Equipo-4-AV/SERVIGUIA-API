@@ -1,5 +1,13 @@
 import axios from "axios";
 import type { StatusResponse, OutputResponse } from "@/types";
+import type {
+  AccessTokenResponse,
+  AuthTokens,
+  LoginRequest,
+  RegisterRequest,
+  RegisterResponse,
+} from "@/features/auth/types";
+import { clearAuthTokens, getAccessToken } from "@/features/auth/tokenStorage";
 
 // ============================================================================
 // Configuración base de Axios
@@ -14,9 +22,63 @@ export const apiClient = axios.create({
   },
 });
 
+apiClient.interceptors.request.use((config) => {
+  const accessToken = getAccessToken();
+
+  if (accessToken) {
+    config.headers.Authorization = `Bearer ${accessToken}`;
+  }
+
+  return config;
+});
+
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const status = error?.response?.status;
+    const requestUrl = error?.config?.url ?? "";
+    const isAuthRequest = requestUrl.includes("/api/auth/");
+
+    if (status === 401 && !isAuthRequest && typeof window !== "undefined") {
+      clearAuthTokens();
+      const currentPath = `${window.location.pathname}${window.location.search}`;
+      const loginUrl = `/login?redirect=${encodeURIComponent(currentPath)}`;
+
+      if (window.location.pathname !== "/login") {
+        window.location.assign(loginUrl);
+      }
+    }
+
+    return Promise.reject(error);
+  },
+);
+
 // ============================================================================
 // Funciones del API (Mapeo directo a los endpoints de Python)
 // ============================================================================
+
+export async function registerUser(payload: RegisterRequest): Promise<RegisterResponse> {
+  const response = await apiClient.post<RegisterResponse>("/api/auth/register", payload);
+  return response.data;
+}
+
+export async function loginUser(payload: LoginRequest): Promise<AuthTokens> {
+  const response = await apiClient.post<AuthTokens>("/api/auth/login", payload);
+  return response.data;
+}
+
+export async function refreshAccessToken(refreshToken: string): Promise<AccessTokenResponse> {
+  const response = await apiClient.post<AccessTokenResponse>("/api/auth/refresh", {
+    refresh_token: refreshToken,
+  });
+  return response.data;
+}
+
+export async function logoutUser(refreshToken: string): Promise<void> {
+  await apiClient.post("/api/auth/logout", {
+    refresh_token: refreshToken,
+  });
+}
 
 /**
  * 1. POST /api/kickoff
