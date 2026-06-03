@@ -4,6 +4,8 @@ import secrets
 from datetime import datetime, timedelta, timezone
 from jose import jwt, JWTError
 from passlib.context import CryptContext
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 SECRET_KEY = os.getenv("JWT_SECRET_KEY", "dev-secret-change-in-production")
 ALGORITHM = "HS256"
@@ -48,3 +50,17 @@ def hash_refresh_token(token: str) -> str:
 
 def get_refresh_token_expiry() -> datetime:
     return datetime.now(timezone.utc) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+
+
+_bearer_scheme = HTTPBearer()
+
+def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(_bearer_scheme),
+) -> str:
+    payload = decode_access_token(credentials.credentials)
+    if payload is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token",
+        )
+    return payload["sub"]
