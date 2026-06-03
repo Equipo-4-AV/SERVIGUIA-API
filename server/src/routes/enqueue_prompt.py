@@ -6,6 +6,7 @@ from src.middlewares.rate_limiter import limiter
 
 from src.repo.task_store import InMemoryTaskStore, get_task_store
 from src.services.classification_service import run_classification
+from src.utils.security import get_current_user
 
 from src.models.task_status_enum import Status
 
@@ -19,7 +20,8 @@ async def enqueue_prompt_classification(
     background_tasks: BackgroundTasks,
     store: Annotated[InMemoryTaskStore, Depends(get_task_store)],
     context: Annotated[str, Form(description="Texto del usuario a clasificar")],
-    image: Annotated[Optional[UploadFile], File(description="Imagen a procesar")] = None
+    image: Annotated[Optional[UploadFile], File(description="Imagen a procesar")] = None,
+    user_id: str = Depends(get_current_user),
 ) -> dict[str, str | bool]:
 
     if not store.has(task_id):

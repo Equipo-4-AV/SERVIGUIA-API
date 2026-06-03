@@ -3,7 +3,6 @@ import json
 from dotenv import load_dotenv
 from sqlmodel import Session
 
-# Load environment variables
 load_dotenv()
 
 from src.data.database import engine, init_db
@@ -16,7 +15,6 @@ from src.data.db_models import (
     WorkerBadgeLink,
 )
 
-# Relative directory helper
 DATA_DIR = os.path.dirname(os.path.abspath(__file__))
 PESOS_PATH = os.path.join(DATA_DIR, "pesos.json")
 TRABAJADORES_PATH = os.path.join(DATA_DIR, "trabajadores.json")
@@ -34,7 +32,6 @@ def seed_database():
     workers_data = load_json_file(TRABAJADORES_PATH)
 
     with Session(engine) as session:
-        # Clear existing data in correct dependency order to prevent foreign key errors
         print("Clearing existing tables...")
         session.query(WorkerSubcategoryLink).delete()
         session.query(WorkerBadgeLink).delete()
@@ -44,7 +41,6 @@ def seed_database():
         session.query(Badge).delete()
         session.commit()
 
-        # 1. Seed Categories
         print("Seeding Categories...")
         categories_map = {}
         for cat_name in pesos_data.get("_categorias_validas", []):
@@ -53,7 +49,6 @@ def seed_database():
             categories_map[cat_name] = category
         session.commit()
 
-        # 2. Seed Subcategories
         print("Seeding Subcategories...")
         subcategories_map = {}
         for cat_name, keywords in pesos_data.get("_mapeo_keywords", {}).items():
@@ -61,14 +56,12 @@ def seed_database():
             if not category:
                 continue
             for kw in keywords:
-                # Avoid duplicates just in case
                 if kw not in subcategories_map:
                     sub = Subcategory(name=kw, category_id=category.id)
                     session.add(sub)
                     subcategories_map[kw] = sub
         session.commit()
 
-        # 3. Seed Badges
         print("Seeding Badges...")
         unique_badges = set()
         for worker_raw in workers_data:
@@ -82,7 +75,6 @@ def seed_database():
             badges_map[badge_name] = badge
         session.commit()
 
-        # 4. Seed Workers and Links
         print("Seeding Workers & relationship links...")
         for worker_raw in workers_data:
             cat_name = worker_raw["categoria"]
@@ -92,7 +84,7 @@ def seed_database():
                 continue
 
             worker = Worker(
-                id=worker_raw["id"],
+                code=worker_raw["id"],
                 name=worker_raw["nombre"],
                 rating=worker_raw["calificacion"],
                 reviews_count=worker_raw["num_reviews"],
@@ -105,14 +97,12 @@ def seed_database():
                 category_id=category.id
             )
             session.add(worker)
-            session.flush()  # Ensure worker.id is active for relationship links
+            session.flush()
 
-            # Link Subcategories
             for sub_name in worker_raw.get("subcategorias", []):
                 sub_obj = subcategories_map.get(sub_name)
                 if not sub_obj:
-                    # Self-healing in case a worker subcategory is missing in pesos.json
-                    print(f"Warning: subcategory '{sub_name}' not found in mapping. Creating under category '{cat_name}'.")
+                    print(f"Warning: subcategory '{sub_name}' not found. Creating under '{cat_name}'.")
                     sub_obj = Subcategory(name=sub_name, category_id=category.id)
                     session.add(sub_obj)
                     session.flush()
@@ -121,7 +111,6 @@ def seed_database():
                 link = WorkerSubcategoryLink(worker_id=worker.id, subcategory_id=sub_obj.id)
                 session.add(link)
 
-            # Link Badges
             for badge_name in worker_raw.get("insignias", []):
                 badge_obj = badges_map.get(badge_name)
                 if badge_obj:

@@ -52,10 +52,20 @@ To populate the database tables with categories and keywords from `pesos.json` a
 docker compose -f docker/compose.yaml --env-file .env exec server python -m src.data.seed
 ```
 
-### Run Unit Tests
-Run the command in a different terminal while the container is running:
+### When schema changes (new tables, new columns), wipe the old DB volume and seed again
 ```bash
-docker exec -it <your-server-docker-container-id>  pytest
+docker compose -f docker/compose.yaml down -v
+```
+#### Rebuild with new dependencies and code
+```bash
+docker compose -f docker/compose.yaml --env-file .env build server
+```
+Then you can run the container with the standard command
+
+## Tests
+#### To run tests do:
+```bash
+docker compose -f docker/compose.yaml --env-file .env exec server python -m pytest
 ```
 
 > [!TIP]
