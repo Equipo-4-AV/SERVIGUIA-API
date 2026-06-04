@@ -1,8 +1,9 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useCallback, useState } from "react";
-import { Coins, Search, AlertCircle, ArrowLeft, MessageSquare, Lock } from "lucide-react";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useCallback, useEffect, useState } from "react";
+import { Coins, Search, AlertCircle, ArrowLeft, MessageSquare, Lock, LogIn, LogOut } from "lucide-react";
 import { Chat } from "@/components/Chat";
 import { CreditsContext } from "@/contexts/CreditsContext";
+import { useAuth } from "@/contexts/AuthContext";
 import logo from "@/assets/logo.png";
 
 export const Route = createFileRoute("/")({
@@ -14,10 +15,18 @@ const INITIAL_CREDITS = 10;
 const CONTACT_COST = 5;
 
 function Index() {
+  const navigate = useNavigate();
+  const { isAuthenticated, logout } = useAuth();
   const [credits, setCredits] = useState<number>(INITIAL_CREDITS);
   const [chatUnlocked, setChatUnlocked] = useState(false);
   const [gateError, setGateError] = useState<string | null>(null);
   const [activeProvider, setActiveProvider] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      void navigate({ to: "/login", replace: true });
+    }
+  }, [isAuthenticated, navigate]);
 
   const handleStart = () => {
     if (credits >= MIN_CREDITS_TO_START) {
@@ -49,6 +58,16 @@ function Index() {
     [credits],
   );
 
+  const handleLogout = async () => {
+    await logout();
+    setActiveProvider(null);
+    setChatUnlocked(false);
+  };
+
+  if (!isAuthenticated) {
+    return <main className="min-h-[100dvh] bg-[image:var(--gradient-subtle)]" />;
+  }
+
   return (
     <CreditsContext.Provider value={{ credits, contactCost: CONTACT_COST, contactProvider }}>
       <div className="flex min-h-[100dvh] min-w-0 flex-col bg-background">
@@ -72,6 +91,23 @@ function Index() {
               </h1>
             </button>
             <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+              {isAuthenticated ? (
+                <button
+                  onClick={handleLogout}
+                  className="inline-flex h-8 items-center gap-1.5 rounded-full border border-border bg-background px-2.5 text-xs font-semibold text-foreground transition-colors hover:bg-secondary sm:px-3"
+                >
+                  <LogOut className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Salir</span>
+                </button>
+              ) : (
+                <Link
+                  to="/login"
+                  className="inline-flex h-8 items-center gap-1.5 rounded-full border border-border bg-background px-2.5 text-xs font-semibold text-foreground transition-colors hover:bg-secondary sm:px-3"
+                >
+                  <LogIn className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Entrar</span>
+                </Link>
+              )}
               <button
                 onClick={() => setCredits((prev) => prev + 5)}
                 className="rounded border border-border/50 px-1.5 py-0.5 text-[10px] font-bold text-muted-foreground opacity-30 transition-opacity hover:bg-secondary hover:opacity-100"
