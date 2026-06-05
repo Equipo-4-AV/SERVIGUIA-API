@@ -70,8 +70,7 @@ jobs:
           mkdir -p ~/.ssh
           ssh-keyscan -H "${{ secrets.HOSTINGER_HOST }}" >> ~/.ssh/known_hosts
 
-      # Asegura que el directorio exista.
-      # Si el .env ya está ahí, rsync NO lo va a borrar gracias al --exclude '.env'
+      # Asegura que el directorio exista en la VPS de Hostinger.
       - name: Target directory initialization
         env:
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
@@ -92,7 +91,9 @@ jobs:
             --exclude '**/__pycache__' \
             ./ "${{ secrets.HOSTINGER_USER }}@${{ secrets.HOSTINGER_HOST }}:${DEPLOY_PATH}/"
 
-      - name: Build and start containers
+      # Lógica inteligente: Si no hay contenedor de BD corriendo, hace instalación limpia + seed.
+      # Si ya existe, hace rebuild sin tocar el volumen de Postgres para mantener la persistencia.
+      - name: Build and smart deploy containers
         env:
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
           HOSTINGER_USER: ${{ secrets.HOSTINGER_USER }}
@@ -100,8 +101,20 @@ jobs:
         run: |
           ssh "${HOSTINGER_USER}@${HOSTINGER_HOST}" \
             "set -euo pipefail && cd '${DEPLOY_PATH}' && \
-            docker compose -f docker/compose.prod.yaml --env-file .env pull --ignore-buildable || true && \
-            docker compose -f docker/compose.prod.yaml --env-file .env up -d --build --remove-orphans && \
+            if ! docker ps -a --format '{{.Names}}' | grep -q '^serviguia-db$'; then \
+              echo '=== INSTALACIÓN INICIAL: No se detectó base de datos activa ==='; \
+              docker compose -f docker/compose.prod.yaml --env-file .env down -v || true; \
+              docker rm -f serviguia-db serviguia-server serviguia-client 2>/dev/null || true; \
+              docker compose -f docker/compose.prod.yaml --env-file .env build --no-cache; \
+              docker compose -f docker/compose.prod.yaml --env-file .env up -d; \
+              echo 'Esperando a que inicialice PostgreSQL...'; \
+              sleep 7; \
+              docker compose -f docker/compose.prod.yaml --env-file .env exec -T server python3 -m src.data.seed; \
+            else \
+              echo '=== ACTUALIZACIÓN: Base de datos existente. Manteniendo persistencia de datos ==='; \
+              docker compose -f docker/compose.prod.yaml --env-file .env build --no-cache client server; \
+              docker compose -f docker/compose.prod.yaml --env-file .env up -d --force-recreate --remove-orphans client server; \
+            fi && \
             docker compose -f docker/compose.prod.yaml --env-file .env ps"
 
       - name: Smoke check API
@@ -110,7 +123,7 @@ jobs:
           HOSTINGER_USER: ${{ secrets.HOSTINGER_USER }}
           HOSTINGER_HOST: ${{ secrets.HOSTINGER_HOST }}
         run: |
-          sleep 15
+          sleep 10
           ssh "${HOSTINGER_USER}@${HOSTINGER_HOST}" \
             "set -euo pipefail && cd '${DEPLOY_PATH}' && \
             docker compose -f docker/compose.prod.yaml --env-file .env exec -T server \

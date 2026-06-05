@@ -1,68 +1,57 @@
-# Producción en VPS (Hostinger). Uso:
-#   docker compose -f docker/compose.prod.yaml --env-file .env up -d --build
-#
-# El archivo .env vive solo en el servidor (chmod 600), no en el repo.
-
-name: serviguia-api
-
 services:
+  # Base de datos PostgreSQL
   db:
     image: postgres:16-alpine
     container_name: serviguia-db
-    restart: unless-stopped
-    env_file:
-      - ../.env
+    restart: always
     environment:
-      POSTGRES_USER: ${DB_USER}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${DB_NAME:-serviguia}
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_prod_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
-      interval: 10s
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_DB:-serviguia}"]
+      interval: 5s
       timeout: 5s
       retries: 5
 
+  # Backend FastAPI
   server:
     build:
-      context: ..
+      context: ../
       dockerfile: server/Dockerfile
-    restart: unless-stopped
-    env_file:
-      - ../.env
+    container_name: serviguia-server
+    restart: always
     environment:
-      DB_HOST: db
-      DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}?schema=public
-    command:
-      [
-        "python3",
-        "-m",
-        "uvicorn",
-        "main:app",
-        "--host",
-        "0.0.0.0",
-        "--port",
-        "8000",
-      ]
+      - DATABASE_URL=postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@db:5432/${DB_NAME:-serviguia}
+      - VITE_API_MODE=production
+      # EL FIX CLAVE: Forzamos al contenedor y a Python a hablar UTF-8 nativo
+      - LANG=C.UTF-8
+      - LC_ALL=C.UTF-8
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
     ports:
-      - "${API_PORT:-8000}:8000"
+      - "8000:8000"
     depends_on:
       db:
         condition: service_healthy
 
+  # Frontend Nginx + Vite SPA
   client:
     build:
-      context: ..
+      context: ../
       dockerfile: client/Dockerfile.prod
       args:
-        VITE_API_BASE_URL: ${VITE_API_BASE_URL}
-        VITE_API_MODE: ${VITE_API_MODE}
-    restart: unless-stopped
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000}
+        VITE_API_MODE: production
+    container_name: serviguia-client
+    restart: always
     ports:
-      - "${CLIENT_PORT:-80}:80"
+      - "3000:80"
     depends_on:
       - server
 
 volumes:
-  postgres_data:
+  postgres_prod_data:

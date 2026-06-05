@@ -46,6 +46,7 @@ docker compose -f docker/compose.yaml logs -f client
 ```
 
 ### Seed the Database
+
 To populate the database tables with categories and keywords from `pesos.json` and workers from `trabajadores.json`, run the seed script inside the server container:
 
 ```bash
@@ -53,17 +54,23 @@ docker compose -f docker/compose.yaml --env-file .env exec server python -m src.
 ```
 
 ### When schema changes (new tables, new columns), wipe the old DB volume and seed again
+
 ```bash
 docker compose -f docker/compose.yaml down -v
 ```
+
 #### Rebuild with new dependencies and code
+
 ```bash
 docker compose -f docker/compose.yaml --env-file .env build server
 ```
+
 Then you can run the container with the standard command
 
 ## Tests
+
 #### To run tests do:
+
 ```bash
 docker compose -f docker/compose.yaml --env-file .env exec server python -m pytest
 ```
