@@ -24,7 +24,7 @@ Don't worry about hot-loading. Docker Compose uses watch to stablish a sync conn
 > Make sure Docker Desktop is running
 
 ```bash
-docker compose -f docker/compose.yaml watch
+docker compose -f docker/compose.yaml --env-file .env watch
 ```
 
 Create your env file once at project root:
@@ -44,10 +44,35 @@ Client logs:
 ```bash
 docker compose -f docker/compose.yaml logs -f client
 ```
-### Run Unit Tests
-Run the command in a different terminal while the container is running:
+
+### Seed the Database
+
+To populate the database tables with categories and keywords from `pesos.json` and workers from `trabajadores.json`, run the seed script inside the server container:
+
 ```bash
-docker exec -it <your-server-docker-container-id>  pytest
+docker compose -f docker/compose.yaml --env-file .env exec server python -m src.data.seed
+```
+
+### When schema changes (new tables, new columns), wipe the old DB volume and seed again
+
+```bash
+docker compose -f docker/compose.yaml down -v
+```
+
+#### Rebuild with new dependencies and code
+
+```bash
+docker compose -f docker/compose.yaml --env-file .env build server
+```
+
+Then you can run the container with the standard command
+
+## Tests
+
+#### To run tests do:
+
+```bash
+docker compose -f docker/compose.yaml --env-file .env exec server python -m pytest
 ```
 
 > [!TIP]

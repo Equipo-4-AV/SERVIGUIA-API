@@ -1,0 +1,130 @@
+name: deploy-serviguia-hostinger
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-hostinger-prod
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: serviguia_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d serviguia_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/serviguia_test
+      OPENAI_API_KEY: sk-test-dummy
+      PARTNER_SERVICE: test-partner
+      CLIENT_APP: test-client
+      JWT_SECRET_KEY: test-jwt-secret
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install backend dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r server/requirements.txt
+      - name: Seed test database
+        working-directory: server
+        run: python -m src.data.seed
+      - name: Run backend tests
+        working-directory: server
+        run: pytest src/tests -q
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Add VPS to known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H "${{ secrets.HOSTINGER_HOST }}" >> ~/.ssh/known_hosts
+
+      # Asegura que el directorio exista en la VPS de Hostinger.
+      - name: Target directory initialization
+        env:
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          HOSTINGER_USER: ${{ secrets.HOSTINGER_USER }}
+          HOSTINGER_HOST: ${{ secrets.HOSTINGER_HOST }}
+        run: |
+          ssh "${HOSTINGER_USER}@${HOSTINGER_HOST}" "mkdir -p '${DEPLOY_PATH}'"
+
+      - name: Sync application code to VPS
+        run: |
+          DEPLOY_PATH="${{ secrets.DEPLOY_PATH }}"
+          rsync -az --delete \
+            --exclude '.git' \
+            --exclude '.env' \
+            --exclude '.env.*' \
+            --exclude 'client/node_modules' \
+            --exclude 'server/.venv' \
+            --exclude '**/__pycache__' \
+            ./ "${{ secrets.HOSTINGER_USER }}@${{ secrets.HOSTINGER_HOST }}:${DEPLOY_PATH}/"
+
+      # Lógica inteligente: Si no hay contenedor de BD corriendo, hace instalación limpia + seed.
+      # Si ya existe, hace rebuild sin tocar el volumen de Postgres para mantener la persistencia.
+      - name: Build and smart deploy containers
+        env:
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          HOSTINGER_USER: ${{ secrets.HOSTINGER_USER }}
+          HOSTINGER_HOST: ${{ secrets.HOSTINGER_HOST }}
+        run: |
+          ssh "${HOSTINGER_USER}@${HOSTINGER_HOST}" \
+            "set -euo pipefail && cd '${DEPLOY_PATH}' && \
+            if ! docker ps -a --format '{{.Names}}' | grep -q '^serviguia-db$'; then \
+              echo '=== INSTALACIÓN INICIAL: No se detectó base de datos activa ==='; \
+              docker compose -f docker/compose.prod.yaml --env-file .env down -v || true; \
+              docker rm -f serviguia-db serviguia-server serviguia-client 2>/dev/null || true; \
+              docker compose -f docker/compose.prod.yaml --env-file .env build --no-cache; \
+              docker compose -f docker/compose.prod.yaml --env-file .env up -d; \
+              echo 'Esperando a que inicialice PostgreSQL...'; \
+              sleep 7; \
+              docker compose -f docker/compose.prod.yaml --env-file .env exec -T server python3 -m src.data.seed; \
+            else \
+              echo '=== ACTUALIZACIÓN: Base de datos existente. Manteniendo persistencia de datos ==='; \
+              docker compose -f docker/compose.prod.yaml --env-file .env build --no-cache client server; \
+              docker compose -f docker/compose.prod.yaml --env-file .env up -d --force-recreate --remove-orphans client server; \
+            fi && \
+            docker compose -f docker/compose.prod.yaml --env-file .env ps"
+
+      - name: Smoke check API
+        env:
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          HOSTINGER_USER: ${{ secrets.HOSTINGER_USER }}
+          HOSTINGER_HOST: ${{ secrets.HOSTINGER_HOST }}
+        run: |
+          sleep 10
+          ssh "${HOSTINGER_USER}@${HOSTINGER_HOST}" \
+            "set -euo pipefail && cd '${DEPLOY_PATH}' && \
+            docker compose -f docker/compose.prod.yaml --env-file .env exec -T server \
+            python3 -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/docs', timeout=10)\""

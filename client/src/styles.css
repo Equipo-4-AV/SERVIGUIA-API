@@ -150,9 +150,16 @@
     border-color: var(--color-border);
   }
 
+  html,
+  body,
+  #root {
+    min-height: 100%;
+  }
+
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
+    overflow-x: hidden;
   }
 }
 

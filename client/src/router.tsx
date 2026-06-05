@@ -1,5 +1,8 @@
-import { createRouter, useRouter } from "@tanstack/react-router";
+import React from "react";
+import ReactDOM from "react-dom/client";
+import { createRouter, useRouter, RouterProvider } from "@tanstack/react-router";
 import { routeTree } from "./routeTree.gen";
+import "./styles.css"; // Nos aseguramos de jalar tus estilos aquí
 
 function DefaultErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   const router = useRouter();
@@ -54,6 +57,7 @@ function DefaultErrorComponent({ error, reset }: { error: Error; reset: () => vo
   );
 }
 
+// Conservamos tu creador del router intacto
 export const getRouter = () => {
   const router = createRouter({
     routeTree,
@@ -65,3 +69,21 @@ export const getRouter = () => {
 
   return router;
 };
+
+// --- AGREGAMOS ESTO PARA PASAR A MODE SPA CLÁSICO ---
+
+const router = getRouter();
+
+// Registro de TypeScript para autocompletado de rutas globales
+declare module "@tanstack/react-router" {
+  interface Register {
+    router: typeof router;
+  }
+}
+
+// Punto de montaje real en el DOM de index.html
+ReactDOM.createRoot(document.getElementById("root")!).render(
+  <React.StrictMode>
+    <RouterProvider router={router} />
+  </React.StrictMode>
+);

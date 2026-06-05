@@ -1,5 +1,20 @@
 import axios from "axios";
+import type { InternalAxiosRequestConfig } from "axios";
 import type { StatusResponse, OutputResponse } from "@/types";
+import type {
+  AccessTokenResponse,
+  AuthTokens,
+  LoginRequest,
+  RegisterRequest,
+  RegisterResponse,
+} from "@/features/auth/types";
+import {
+  clearAuthTokens,
+  getAccessToken,
+  getRefreshToken,
+  isAccessTokenExpiring,
+  saveAccessToken,
+} from "@/features/auth/tokenStorage";
 
 // ============================================================================
 // Configuración base de Axios
@@ -14,9 +29,123 @@ export const apiClient = axios.create({
   },
 });
 
+type RetriableRequestConfig = InternalAxiosRequestConfig & {
+  _retry?: boolean;
+};
+
+let refreshPromise: Promise<string | null> | null = null;
+
+function isAuthRequestUrl(url?: string) {
+  return Boolean(url?.includes("/api/auth/"));
+}
+
+function redirectToLogin() {
+  if (typeof window === "undefined" || window.location.pathname === "/login") return;
+
+  window.location.assign("/login");
+}
+
+async function getFreshAccessToken() {
+  const refreshToken = getRefreshToken();
+
+  if (!refreshToken) {
+    clearAuthTokens();
+    return null;
+  }
+
+  if (!refreshPromise) {
+    refreshPromise = axios
+      .post<AccessTokenResponse>(
+        "/api/auth/refresh",
+        { refresh_token: refreshToken },
+        { baseURL },
+      )
+      .then((response) => {
+        saveAccessToken(response.data.access_token);
+        return response.data.access_token;
+      })
+      .catch(() => {
+        clearAuthTokens();
+        return null;
+      })
+      .finally(() => {
+        refreshPromise = null;
+      });
+  }
+
+  return refreshPromise;
+}
+
+apiClient.interceptors.request.use(async (config) => {
+  if (isAuthRequestUrl(config.url)) {
+    return config;
+  }
+
+  let accessToken = getAccessToken();
+
+  if (!accessToken || isAccessTokenExpiring(accessToken)) {
+    accessToken = await getFreshAccessToken();
+  }
+
+  if (accessToken) {
+    config.headers.Authorization = `Bearer ${accessToken}`;
+  }
+
+  return config;
+});
+
+apiClient.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const status = error?.response?.status;
+    const originalRequest = error?.config as RetriableRequestConfig | undefined;
+    const isAuthRequest = isAuthRequestUrl(originalRequest?.url);
+
+    if (status === 401 && originalRequest && !originalRequest._retry && !isAuthRequest) {
+      originalRequest._retry = true;
+      const accessToken = await getFreshAccessToken();
+
+      if (accessToken) {
+        originalRequest.headers.Authorization = `Bearer ${accessToken}`;
+        return apiClient(originalRequest);
+      }
+    }
+
+    if (status === 401 && !isAuthRequest) {
+      clearAuthTokens();
+      redirectToLogin();
+    }
+
+    return Promise.reject(error);
+  },
+);
+
 // ============================================================================
 // Funciones del API (Mapeo directo a los endpoints de Python)
 // ============================================================================
+
+export async function registerUser(payload: RegisterRequest): Promise<RegisterResponse> {
+  const response = await apiClient.post<RegisterResponse>("/api/auth/register", payload);
+  return response.data;
+}
+
+export async function loginUser(payload: LoginRequest): Promise<AuthTokens> {
+  const response = await apiClient.post<AuthTokens>("/api/auth/login", payload);
+  return response.data;
+}
+
+export async function refreshAccessToken(refreshToken: string): Promise<AccessTokenResponse> {
+  const response = await apiClient.post<AccessTokenResponse>("/api/auth/refresh", {
+    refresh_token: refreshToken,
+  });
+  return response.data;
+}
+
+export async function logoutUser(refreshToken: string): Promise<void> {
+  await apiClient.post("/api/auth/logout", {
+    refresh_token: refreshToken,
+  });
+}
 
 /**
  * 1. POST /api/kickoff
