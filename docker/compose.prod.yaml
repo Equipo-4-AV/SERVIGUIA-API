@@ -1,0 +1,68 @@
+# Producción en VPS (Hostinger). Uso:
+#   docker compose -f docker/compose.prod.yaml --env-file .env up -d --build
+#
+# El archivo .env vive solo en el servidor (chmod 600), no en el repo.
+
+name: serviguia-api
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: serviguia-db
+    restart: unless-stopped
+    env_file:
+      - ../.env
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  server:
+    build:
+      context: ..
+      dockerfile: server/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ../.env
+    environment:
+      DB_HOST: db
+      DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}?schema=public
+    command:
+      [
+        "python3",
+        "-m",
+        "uvicorn",
+        "main:app",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8000",
+      ]
+    ports:
+      - "${API_PORT:-8000}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  client:
+    build:
+      context: ..
+      dockerfile: client/Dockerfile.prod
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL}
+        VITE_API_MODE: ${VITE_API_MODE}
+    restart: unless-stopped
+    ports:
+      - "${CLIENT_PORT:-80}:80"
+    depends_on:
+      - server
+
+volumes:
+  postgres_data:
