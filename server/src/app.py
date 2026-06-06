@@ -41,13 +41,18 @@ Receives input data of user form mobile app: {os.getenv('CLIENT_APP')}
     }
 )
 
+origins = [
+    "http://localhost:3000",      # Para tus pruebas locales de producción
+    "http://localhost:5173",      # Para tu entorno de desarrollo con Vite (Vite watch)
+]
+
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(InternalErrorHandler)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
