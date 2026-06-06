@@ -44,6 +44,7 @@ Receives input data of user form mobile app: {os.getenv('CLIENT_APP')}
 origins = [
     "http://localhost:3000",      # Para tus pruebas locales de producción
     "http://localhost:5173",      # Para tu entorno de desarrollo con Vite (Vite watch)
+    "http://148.230.90.95:3000",
 ]
 
 app.state.limiter = limiter
