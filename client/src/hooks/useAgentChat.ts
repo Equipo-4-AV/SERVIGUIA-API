@@ -112,6 +112,25 @@ export function useAgentChat() {
           if (backendError) {
             console.error("Error reportado por el servidor:", backendError);
           }
+          
+          // Solo si el error es por exceder los intentos fallidos, mostramos el mensaje como asistente
+          if (backendError && backendError.includes("intentos sin éxito")) {
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: generateId(),
+                role: "assistant",
+                type: "text",
+                text: "Para poder ayudarte mejor, ¿podrías describirme tu problema nuevamente aportando más detalles?",
+                timestamp: Date.now(),
+              },
+            ]);
+            taskIdRef.current = null;
+            setIsProcessing(false);
+            break;
+          }
+
+          // Para todos los demás errores, lanzamos el error del servidor normal
           throw new Error(SERVER_ERROR_MESSAGE);
         } else if (status === "completed") {
           setCurrentResult(result || null);
