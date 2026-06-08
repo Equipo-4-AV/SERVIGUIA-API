@@ -50,15 +50,15 @@ export function LoginPage() {
                 Acceso a ServiApp
               </h1>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                Inicia sesion o crea tu cuenta para buscar proveedores de forma segura.
+                Inicia sesión o crea tu cuenta para buscar proveedores de forma segura.
               </p>
             </div>
 
             {isAuthenticated && (
               <div className="mb-5 rounded-xl border border-success/30 bg-success/10 p-4 text-sm text-success">
-                <p className="font-medium">Sesion activa</p>
+                <p className="font-medium">Sesión activa</p>
                 <p className="mt-1 text-success/90">
-                  Ya puedes entrar a ServiApp o cerrar sesion para usar otra cuenta.
+                  Ya puedes entrar a ServiApp o cerrar sesión para usar otra cuenta.
                 </p>
                 <div className="mt-4 grid gap-2 sm:grid-cols-[1fr_auto]">
                   <button
@@ -75,7 +75,7 @@ export function LoginPage() {
                     className="inline-flex h-11 items-center justify-center gap-1.5 rounded-xl border border-success/40 bg-card px-4 text-sm font-semibold text-success transition-colors hover:bg-success/10"
                   >
                     <LogOut className="h-4 w-4" />
-                    Cerrar sesion
+                    Cerrar sesión
                   </button>
                 </div>
               </div>
