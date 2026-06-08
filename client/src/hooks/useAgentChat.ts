@@ -5,6 +5,15 @@ import { startKickoff, sendPrompt, getStatus, getOutput } from "../api";
 const SERVER_ERROR_MESSAGE =
   "Error de servidor. Espera unos minutos o llama a emergencias si necesitas ayuda inmediata.";
 
+// SUTITUTO SEGURO: Genera un ID único para React sin depender de HTTPS
+const generateId = (): string => {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  // Fallback matemático ultra rápido si crypto no está disponible
+  return Math.random().toString(36).substring(2, 11) + Date.now().toString(36);
+};
+
 export function useAgentChat() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -36,7 +45,7 @@ export function useAgentChat() {
         const lastMsg = prev[prev.length - 1];
         if (lastMsg.type !== "separator") {
           newMessages.push({
-            id: crypto.randomUUID(),
+            id: generateId(),
             role: "system",
             type: "separator",
             timestamp: Date.now(),
@@ -45,7 +54,7 @@ export function useAgentChat() {
       }
 
       const userMsg: ChatMessage = {
-        id: crypto.randomUUID(),
+        id: generateId(),
         role: "user",
         type: "text",
         text,
@@ -90,7 +99,7 @@ export function useAgentChat() {
           setMessages((prev) => [
             ...prev,
             {
-              id: crypto.randomUUID(),
+              id: generateId(),
               role: "assistant",
               type: "text",
               text: message || lastAssistantMsg || "Necesito más información.",
@@ -111,7 +120,7 @@ export function useAgentChat() {
             setMessages((prev) => [
               ...prev,
               {
-                id: crypto.randomUUID(),
+                id: generateId(),
                 role: "assistant",
                 type: "text",
                 text: result.safety_message || "¡EMERGENCIA DETECTADA!",
@@ -125,7 +134,7 @@ export function useAgentChat() {
             setMessages((prev) => [
               ...prev,
               {
-                id: crypto.randomUUID(),
+                id: generateId(),
                 role: "assistant",
                 type: "text",
                 text:
@@ -134,7 +143,7 @@ export function useAgentChat() {
                 timestamp: Date.now(),
               },
               {
-                id: crypto.randomUUID(),
+                id: generateId(),
                 role: "assistant",
                 type: "providers",
                 providers: outputRes.providers || [],
