@@ -79,6 +79,7 @@ export function Chat() {
   // Timer refs for the 45-second auto-stop and the per-second countdown
   const autoStopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const isAutoRestartingRef = useRef(false);
 
   const creditsCtx = useContext(CreditsContext);
 
@@ -197,27 +198,32 @@ export function Chat() {
       setIsTranscribing(false);
       setIsPaused(false);
       setVoiceHint(null);
-      if (!isPaused) {
+      if (!isPaused && !isAutoRestartingRef.current) {
         setText("");
         finalTranscriptRef.current = "";
       }
 
-      setRecordingTimeLeft(45);
+      if (!isAutoRestartingRef.current) {
+        setRecordingTimeLeft(45);
 
-      countdownIntervalRef.current = setInterval(() => {
-        setRecordingTimeLeft((prev) => {
-          if (prev === null || prev <= 1) {
-            if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
-            countdownIntervalRef.current = null;
-            return null;
-          }
-          return prev - 1;
-        });
-      }, 1000);
+        countdownIntervalRef.current = setInterval(() => {
+          setRecordingTimeLeft((prev) => {
+            if (prev === null || prev <= 1) {
+              if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
+              countdownIntervalRef.current = null;
+              return null;
+            }
+            return prev - 1;
+          });
+        }, 1000);
 
-      autoStopTimerRef.current = setTimeout(() => {
-        recognitionRef.current?.stop();
-      }, 45_000);
+        autoStopTimerRef.current = setTimeout(() => {
+          isAutoRestartingRef.current = false;
+          recognitionRef.current?.stop();
+        }, 45_000);
+      }
+      
+      isAutoRestartingRef.current = false;
     };
 
     recognition.onresult = (event: SpeechRecognitionEvent) => {
@@ -237,6 +243,12 @@ export function Chat() {
 
     recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
       console.error("[STT] error:", event.error);
+      
+      if (event.error === "no-speech") {
+        isAutoRestartingRef.current = true;
+        return;
+      }
+
       clearTimers();
       setIsTranscribing(false);
       setIsVoiceActive(false);
@@ -250,14 +262,22 @@ export function Chat() {
         setVoiceHint(
           "No se pudo acceder al micrófono. Verifica los permisos del navegador o escribe tu mensaje.",
         );
-      } else if (event.error === "no-speech") {
-        setVoiceHint("No detectamos ninguna voz. Intenta de nuevo o escribe tu mensaje.");
       } else {
         setVoiceHint("No pudimos procesar el audio. Intenta de nuevo o escribe tu mensaje.");
       }
     };
 
     recognition.onend = () => {
+      if (isAutoRestartingRef.current) {
+        try {
+          recognitionRef.current?.start();
+        } catch (e) {
+          console.error("[STT] Auto-restart failed", e);
+          isAutoRestartingRef.current = false;
+        }
+        if (isAutoRestartingRef.current) return;
+      }
+
       clearTimers();
       setIsVoiceActive(false);
       setIsTranscribing(false);
@@ -564,7 +584,7 @@ export function Chat() {
               </div>
 
               {(isVoiceActive || isPaused) && (
-                <div className="mt-2.5 flex flex-wrap items-center gap-2">
+                <div className="mt-2.5 flex flex-wrap items-center justify-end gap-2">
                   {isVoiceActive && (
                     <>
                       <button
