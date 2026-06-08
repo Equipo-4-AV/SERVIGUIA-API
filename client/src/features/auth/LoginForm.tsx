@@ -30,23 +30,23 @@ function getAuthErrorMessage(error: unknown, mode: AuthMode) {
   const detail = response?.data?.detail;
 
   if (status === 409) {
-    return "Ese correo ya esta registrado. Intenta iniciar sesion.";
+    return "Ese correo ya está registrado. Intenta iniciar sesión.";
   }
 
   if (status === 401) {
-    return "Correo o contrasena incorrectos.";
+    return "Correo o contraseña incorrectos.";
   }
 
   if (status === 403) {
-    return "La cuenta esta desactivada.";
+    return "La cuenta está desactivada.";
   }
 
   if (status === 422) {
-    return "Revisa que el correo y la contrasena tengan un formato valido.";
+    return "Revisa que el correo y la contraseña tengan un formato válido.";
   }
 
   if (status && status >= 500) {
-    return "El servidor no pudo completar la solicitud. Revisa que la base de datos este inicializada.";
+    return "El servidor no pudo completar la solicitud. Revisa que la base de datos esté inicializada.";
   }
 
   if (detail) {
@@ -55,7 +55,7 @@ function getAuthErrorMessage(error: unknown, mode: AuthMode) {
 
   return mode === "register"
     ? "No pudimos crear tu cuenta. Revisa tus datos e intenta de nuevo."
-    : "No pudimos iniciar sesion. Revisa tus datos e intenta de nuevo.";
+    : "No pudimos iniciar sesión. Revisa tus datos e intenta de nuevo.";
 }
 
 function validateAuth(
@@ -66,22 +66,22 @@ function validateAuth(
   const errors: LoginFormErrors = {};
 
   if (!credentials.email.trim()) {
-    errors.email = "Ingresa tu correo electronico.";
+    errors.email = "Ingresa tu correo electrónico.";
   } else if (!EMAIL_PATTERN.test(credentials.email.trim())) {
-    errors.email = "Ingresa un correo electronico valido.";
+    errors.email = "Ingresa un correo electrónico válido.";
   }
 
   if (!credentials.password) {
-    errors.password = "Ingresa tu contrasena.";
+    errors.password = "Ingresa tu contraseña.";
   } else if (mode === "register" && credentials.password.length < MIN_PASSWORD_LENGTH) {
     errors.password = `Usa al menos ${MIN_PASSWORD_LENGTH} caracteres.`;
   }
 
   if (mode === "register") {
     if (!confirmPassword) {
-      errors.confirmPassword = "Confirma tu contrasena.";
+      errors.confirmPassword = "Confirma tu contraseña.";
     } else if (confirmPassword !== credentials.password) {
-      errors.confirmPassword = "Las contrasenas no coinciden.";
+      errors.confirmPassword = "Las contraseñas no coinciden.";
     }
   }
 
@@ -159,7 +159,7 @@ export function LoginForm({ onLogin, onRegister }: LoginFormProps) {
               : "text-muted-foreground hover:text-foreground"
           }`}
         >
-          Iniciar sesion
+          Iniciar sesión
         </button>
         <button
           type="button"
@@ -185,7 +185,7 @@ export function LoginForm({ onLogin, onRegister }: LoginFormProps) {
       )}
 
       <div className="space-y-2">
-        <Label htmlFor="email">Correo electronico</Label>
+        <Label htmlFor="email">Correo electrónico</Label>
         <div className="relative">
           <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -211,7 +211,7 @@ export function LoginForm({ onLogin, onRegister }: LoginFormProps) {
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="password">Contrasena</Label>
+        <Label htmlFor="password">Contraseña</Label>
         <div className="relative">
           <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -219,7 +219,7 @@ export function LoginForm({ onLogin, onRegister }: LoginFormProps) {
             name="password"
             type="password"
             autoComplete={mode === "register" ? "new-password" : "current-password"}
-            placeholder="Ingresa tu contrasena"
+            placeholder="Ingresa tu contraseña"
             value={credentials.password}
             onChange={(event) => updateField("password", event.target.value)}
             disabled={isSubmitting}
@@ -237,7 +237,7 @@ export function LoginForm({ onLogin, onRegister }: LoginFormProps) {
 
       {mode === "register" && (
         <div className="space-y-2">
-          <Label htmlFor="confirm-password">Confirmar contrasena</Label>
+          <Label htmlFor="confirm-password">Confirmar contraseña</Label>
           <div className="relative">
             <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -245,7 +245,7 @@ export function LoginForm({ onLogin, onRegister }: LoginFormProps) {
               name="confirm-password"
               type="password"
               autoComplete="new-password"
-              placeholder="Repite tu contrasena"
+              placeholder="Repite tu contraseña"
               value={confirmPassword}
               onChange={(event) => {
                 setConfirmPassword(event.target.value);
@@ -277,10 +277,10 @@ export function LoginForm({ onLogin, onRegister }: LoginFormProps) {
         {isSubmitting ? (
           <>
             <Loader2 className="h-4 w-4 animate-spin" />
-            {mode === "register" ? "Creando cuenta" : "Iniciando sesion"}
+            {mode === "register" ? "Creando cuenta" : "Iniciando sesión"}
           </>
         ) : (
-          mode === "register" ? "Crear cuenta" : "Iniciar sesion"
+          mode === "register" ? "Crear cuenta" : "Iniciar sesión"
         )}
       </Button>
     </form>
