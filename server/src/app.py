@@ -45,6 +45,7 @@ origins = [
     "http://localhost:3000",      # Para tus pruebas locales de producción
     "http://localhost:5173",      # Para tu entorno de desarrollo con Vite (Vite watch)
     "http://2.25.187.252:3000",
+    "https://serviguia.online",
 ]
 
 app.state.limiter = limiter
