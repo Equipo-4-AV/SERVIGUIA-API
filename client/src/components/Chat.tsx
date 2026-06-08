@@ -8,6 +8,10 @@ import {
   MessageCircle,
   MessageSquare,
   Mic,
+  Square,
+  RotateCcw,
+  Play,
+  SendHorizonal,
 } from "lucide-react";
 import { MessageBubble } from "./MessageBubble";
 import { ProcessingStatus } from "./ProcessingStatus";
@@ -60,8 +64,8 @@ export function Chat() {
   const [modalError, setModalError] = useState<string | null>(null);
   const [showNoCreditsAlert, setShowNoCreditsAlert] = useState(false);
   const [isVoiceActive, setIsVoiceActive] = useState(false);
-  // isTranscribing: true between recognition.stop() and onresult/onerror (RF-STT-03)
   const [isTranscribing, setIsTranscribing] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
   // Countdown seconds remaining (max 45s) shown in the status bar
   const [recordingTimeLeft, setRecordingTimeLeft] = useState<number | null>(null);
   const [voiceHint, setVoiceHint] = useState<string | null>(null);
@@ -151,17 +155,9 @@ export function Chat() {
     if (fileRef.current) fileRef.current.value = "";
   };
 
-  /**
-   * Toggles Web Speech API recording on/off.
-   * First click  → starts continuous recognition, max 45 s  (RF-STT-01, RF-STT-02)
-   * Second click → stops immediately                         (RF-STT-02)
-   * Shows interim transcription live in the textarea (semi-real-time).
-   * Auto-sends on session end using all accumulated final segments.
-   */
   const toggleVoiceRecording = () => {
     if (isProcessing) return;
 
-    // [RF-STT-02] Second click: stop immediately
     if (isVoiceActive) {
       recognitionRef.current?.stop();
       return;
@@ -196,17 +192,18 @@ export function Chat() {
     recognition.continuous = true;      // keep listening up to 45 s
     recognition.interimResults = true;  // semi-real-time transcription
 
-    // [RF-STT-01] Session started
     recognition.onstart = () => {
       setIsVoiceActive(true);
       setIsTranscribing(false);
+      setIsPaused(false);
       setVoiceHint(null);
-      setText("");
-      finalTranscriptRef.current = "";
+      if (!isPaused) {
+        setText("");
+        finalTranscriptRef.current = "";
+      }
 
       setRecordingTimeLeft(45);
 
-      // Per-second countdown
       countdownIntervalRef.current = setInterval(() => {
         setRecordingTimeLeft((prev) => {
           if (prev === null || prev <= 1) {
@@ -218,13 +215,11 @@ export function Chat() {
         });
       }, 1000);
 
-      // Hard stop after 45 s
       autoStopTimerRef.current = setTimeout(() => {
         recognitionRef.current?.stop();
       }, 45_000);
     };
 
-    // Semi-real-time: accumulate finals, show interim live in textarea
     recognition.onresult = (event: SpeechRecognitionEvent) => {
       let interimTranscript = "";
 
@@ -237,16 +232,15 @@ export function Chat() {
         }
       }
 
-      // Show confirmed text + what is being spoken right now
       setText((finalTranscriptRef.current + interimTranscript).trimStart());
     };
 
-    // [RF-STT-04 / RF-STT-07] Error handling
     recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
       console.error("[STT] error:", event.error);
       clearTimers();
       setIsTranscribing(false);
       setIsVoiceActive(false);
+      setIsPaused(false);
       setText("");
       finalTranscriptRef.current = "";
 
@@ -263,25 +257,20 @@ export function Chat() {
       }
     };
 
-    // [RF-STT-02 / RF-STT-06] Session ended — auto-send accumulated text with any pre-selected image
     recognition.onend = () => {
       clearTimers();
       setIsVoiceActive(false);
       setIsTranscribing(false);
 
       const finalText = finalTranscriptRef.current.trim();
-      // Clear immediately — guards against any edge case where onend could fire twice
-      finalTranscriptRef.current = "";
+      setText(finalText);
 
       if (finalText) {
-        sendMessage(finalText, image);
-        setText("");
-        setImage(null);
-        setImagePreview(null);
-        if (fileRef.current) fileRef.current.value = "";
-        setVoiceHint("✓ Mensaje de voz enviado.");
+        setIsPaused(true);
+        setVoiceHint("Grabación detenida. Revisa, continúa o envía tu mensaje.");
       } else {
-        setText("");
+        setIsPaused(false);
+        finalTranscriptRef.current = "";
       }
     };
 
@@ -296,18 +285,44 @@ export function Chat() {
   };
 
   const cancelVoiceRecording = () => {
-    if (!recognitionRef.current) return;
-
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.abort();
+      } catch { /* already stopped */ }
+    }
     finalTranscriptRef.current = "";
     setText("");
-    try {
-      recognitionRef.current.abort();
-    } catch (err) {
-      console.error("[STT] Error aborting recognition:", err);
-      setIsVoiceActive(false);
-      setIsTranscribing(false);
-      setVoiceHint("Grabación cancelada.");
-    }
+    setIsVoiceActive(false);
+    setIsTranscribing(false);
+    setIsPaused(false);
+    setVoiceHint("Grabación cancelada.");
+  };
+
+  const redoRecording = () => {
+    finalTranscriptRef.current = "";
+    setText("");
+    setIsPaused(false);
+    setVoiceHint(null);
+    toggleVoiceRecording();
+  };
+
+  const continueRecording = () => {
+    setIsPaused(false);
+    setVoiceHint(null);
+    toggleVoiceRecording();
+  };
+
+  const sendVoiceMessage = () => {
+    const messageText = text.trim();
+    if (!messageText) return;
+    sendMessage(messageText, image);
+    setText("");
+    setImage(null);
+    setImagePreview(null);
+    setIsPaused(false);
+    setVoiceHint("✓ Mensaje de voz enviado.");
+    finalTranscriptRef.current = "";
+    if (fileRef.current) fileRef.current.value = "";
   };
 
   return (
@@ -487,72 +502,122 @@ export function Chat() {
               </button>
             </div>
           )}
-          {/* [RF-STT-03] Voice status bar — non-blocking, auto-dismissed */}
-          {(voiceHint || isTranscribing || isVoiceActive) && (
+          {(voiceHint || isTranscribing || isVoiceActive || isPaused) && (
             <div
-              className="mb-2 flex items-center justify-between gap-2 px-2 text-xs font-medium"
+              className="mb-2 rounded-xl border border-border bg-secondary/50 px-3 py-2.5"
               aria-live="polite"
               role="status"
             >
-              <div className="flex items-center gap-2">
-                {isVoiceActive ? (
-                  /* ── Recording: red pulse + live countdown ── */
-                  <>
-                    <span className="relative flex h-2.5 w-2.5 shrink-0">
-                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-destructive opacity-75" />
-                      <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-destructive" />
-                    </span>
-                    <span className="text-destructive">
-                      Escuchando…{recordingTimeLeft !== null ? ` ${recordingTimeLeft}s` : ""}
-                    </span>
-                    {recordingTimeLeft !== null && (
-                      <span className="ml-1 text-muted-foreground/70">/ 45s</span>
-                    )}
-                  </>
-                ) : isTranscribing ? (
-                  /* ── Post-recording spinner (RF-STT-03) ── */
-                  <>
-                    <span className="relative flex h-2.5 w-2.5 shrink-0">
-                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
-                      <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-amber-500" />
-                    </span>
-                    <span className="text-amber-600 dark:text-amber-400">Transcribiendo voz…</span>
-                  </>
-                ) : (
-                  /* ── Static hint: success / error ── */
-                  <>
-                    <span
-                      className={`h-2 w-2 shrink-0 rounded-full ${
-                        voiceHint?.startsWith("✓")
-                          ? "bg-emerald-500"
-                          : voiceHint?.includes("No") || voiceHint?.includes("pudo")
-                            ? "bg-destructive"
-                            : "bg-primary"
-                      }`}
-                    />
-                    <span
-                      className={`${
-                        voiceHint?.startsWith("✓")
-                          ? "text-emerald-600 dark:text-emerald-400"
-                          : voiceHint?.includes("No") || voiceHint?.includes("pudo")
-                            ? "text-destructive"
-                            : "text-primary"
-                      }`}
-                    >
-                      {voiceHint}
-                    </span>
-                  </>
-                )}
+              <div className="flex items-center justify-between gap-2 text-xs font-medium">
+                <div className="flex items-center gap-2">
+                  {isVoiceActive ? (
+                    <>
+                      <span className="relative flex h-2.5 w-2.5 shrink-0">
+                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-destructive opacity-75" />
+                        <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-destructive" />
+                      </span>
+                      <span className="text-destructive">
+                        Escuchando…{recordingTimeLeft !== null ? ` ${recordingTimeLeft}s` : ""}
+                      </span>
+                      {recordingTimeLeft !== null && (
+                        <span className="ml-1 text-muted-foreground/70">/ 45s</span>
+                      )}
+                    </>
+                  ) : isTranscribing ? (
+                    <>
+                      <span className="relative flex h-2.5 w-2.5 shrink-0">
+                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
+                        <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-amber-500" />
+                      </span>
+                      <span className="text-amber-600 dark:text-amber-400">Transcribiendo voz…</span>
+                    </>
+                  ) : isPaused ? (
+                    <>
+                      <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-amber-500" />
+                      <span className="text-amber-600 dark:text-amber-400">Grabación pausada — revisa tu mensaje</span>
+                    </>
+                  ) : (
+                    <>
+                      <span
+                        className={`h-2 w-2 shrink-0 rounded-full ${
+                          voiceHint?.startsWith("✓")
+                            ? "bg-emerald-500"
+                            : voiceHint?.includes("No") || voiceHint?.includes("pudo")
+                              ? "bg-destructive"
+                              : "bg-primary"
+                        }`}
+                      />
+                      <span
+                        className={`${
+                          voiceHint?.startsWith("✓")
+                            ? "text-emerald-600 dark:text-emerald-400"
+                            : voiceHint?.includes("No") || voiceHint?.includes("pudo")
+                              ? "text-destructive"
+                              : "text-primary"
+                        }`}
+                      >
+                        {voiceHint}
+                      </span>
+                    </>
+                  )}
+                </div>
               </div>
-              {isVoiceActive && (
-                <button
-                  onClick={cancelVoiceRecording}
-                  className="flex items-center gap-1 text-destructive/80 hover:text-destructive transition-colors duration-150 rounded px-1.5 py-0.5 hover:bg-destructive/5 font-semibold"
-                  title="Cancelar audio"
-                >
-                  <X className="h-3.5 w-3.5" />
-                  <span>Cancelar audio</span>
-                </button>
+
+              {(isVoiceActive || isPaused) && (
+                <div className="mt-2.5 flex flex-wrap items-center gap-2">
+                  {isVoiceActive && (
+                    <>
+                      <button
+                        onClick={() => recognitionRef.current?.stop()}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500/15 px-3 py-1.5 text-xs font-semibold text-amber-700 transition-colors hover:bg-amber-500/25 dark:text-amber-400"
+                      >
+                        <Square className="h-3 w-3" />
+                        Detener
+                      </button>
+                      <button
+                        onClick={cancelVoiceRecording}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-destructive/10 px-3 py-1.5 text-xs font-semibold text-destructive transition-colors hover:bg-destructive/20"
+                      >
+                        <X className="h-3 w-3" />
+                        Cancelar
+                      </button>
+                    </>
+                  )}
+
+                  {isPaused && (
+                    <>
+                      <button
+                        onClick={continueRecording}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500/15 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-500/25 dark:text-emerald-400"
+                      >
+                        <Play className="h-3 w-3" />
+                        Continuar
+                      </button>
+                      <button
+                        onClick={redoRecording}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-secondary px-3 py-1.5 text-xs font-semibold text-muted-foreground transition-colors hover:bg-secondary/80 hover:text-foreground"
+                      >
+                        <RotateCcw className="h-3 w-3" />
+                        Rehacer
+                      </button>
+                      <button
+                        onClick={cancelVoiceRecording}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-destructive/10 px-3 py-1.5 text-xs font-semibold text-destructive transition-colors hover:bg-destructive/20"
+                      >
+                        <X className="h-3 w-3" />
+                        Cancelar
+                      </button>
+                      <button
+                        onClick={sendVoiceMessage}
+                        disabled={!text.trim()}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-[image:var(--gradient-primary)] px-3 py-1.5 text-xs font-semibold text-primary-foreground shadow-sm transition-opacity hover:opacity-90 disabled:opacity-40"
+                      >
+                        <SendHorizonal className="h-3 w-3" />
+                        Enviar
+                      </button>
+                    </>
+                  )}
+                </div>
               )}
             </div>
           )}
@@ -593,10 +658,9 @@ export function Chat() {
             <TooltipProvider delayDuration={150}>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  {/* [RF-STT-01 / RF-STT-02] Mic button — red/pulsing while recording */}
                   <button
                     onClick={toggleVoiceRecording}
-                    disabled={isProcessing || isTranscribing}
+                    disabled={isProcessing || isTranscribing || isPaused}
                     aria-label={isVoiceActive ? "Detener dictado" : "Dictar mensaje"}
                     aria-pressed={isVoiceActive}
                     className={`relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition-all duration-200 disabled:opacity-40 sm:h-12 sm:w-12 ${
@@ -604,10 +668,11 @@ export function Chat() {
                         ? "bg-destructive/10 text-destructive ring-2 ring-destructive/40 scale-105"
                         : isTranscribing
                           ? "bg-amber-500/10 text-amber-600 dark:text-amber-400"
-                          : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                          : isPaused
+                            ? "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                            : "text-muted-foreground hover:bg-secondary hover:text-foreground"
                     }`}
                   >
-                    {/* Ripple effect while actively listening */}
                     {isVoiceActive && (
                       <span className="absolute h-8 w-8 animate-ping rounded-full bg-destructive/25" />
                     )}
@@ -616,10 +681,12 @@ export function Chat() {
                 </TooltipTrigger>
                 <TooltipContent side="top">
                   {isVoiceActive
-                    ? "Clic para detener y procesar"
+                    ? "Clic para detener"
                     : isTranscribing
                       ? "Transcribiendo…"
-                      : "Dictar mensaje (español)"}
+                      : isPaused
+                        ? "Grabación pausada"
+                        : "Dictar mensaje (español)"}
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
