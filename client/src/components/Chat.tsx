@@ -86,7 +86,11 @@ export function Chat() {
   const { messages, currentResult, isProcessing, error, sendMessage, clearChat } = useAgentChat();
 
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+    // We add a tiny delay to ensure the DOM has updated with the new messages' heights
+    const timer = setTimeout(() => {
+      scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+    }, 150);
+    return () => clearTimeout(timer);
   }, [messages, isProcessing]);
 
   useEffect(() => {
@@ -146,6 +150,16 @@ export function Chat() {
   const send = () => {
     const messageText = text.trim();
     if (!messageText || isProcessing) return;
+
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.abort();
+      } catch (e) {
+        // ignore
+      }
+    }
+    if (autoStopTimerRef.current) clearTimeout(autoStopTimerRef.current);
+    if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
 
     setIsVoiceActive(false);
     setIsTranscribing(false);
